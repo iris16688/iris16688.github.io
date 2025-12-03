@@ -1,0 +1,2982 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="一个简单易用的客户欠款记账系统">
+    <meta name="theme-color" content="#2D3748">
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" href="icon-192.png" type="image/png">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <title>客户欠款记账系统</title>
+    <!-- Tailwind CSS v3 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome -->
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.8/dist/chart.umd.min.js"></script>
+    <!-- Firebase -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js"></script>
+    <!-- Firebase配置 -->
+    <script src="js/firebase.js"></script>
+    <!-- 统一的 Tailwind 配置 -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#2D3748',
+                        secondary: '#E2E8F0',
+                        accent: '#3182CE',
+                        danger: '#E53E3E',
+                        success: '#38A169',
+                        warning: '#ED8936',
+                        light: '#F7FAFC',
+                        dark: '#1A202C'
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                    },
+                    animation: {
+                        'fade-in': 'fadeIn 0.5s ease-in-out',
+                        'slide-in': 'slideIn 0.5s ease-in-out',
+                        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                    },
+                    keyframes: {
+                        fadeIn: {
+                            '0%': { opacity: '0' },
+                            '100%': { opacity: '1' },
+                        },
+                        slideIn: {
+                            '0%': { transform: 'translateY(20px)', opacity: '0' },
+                            '100%': { transform: 'translateY(0)', opacity: '1' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .content-auto {
+                content-visibility: auto;
+            }
+            .text-balance {
+                text-wrap: balance;
+            }
+            .line-element {
+                @apply h-px bg-gray-300 my-4;
+            }
+            .card-hover {
+                @apply transition-all duration-300 hover:shadow-md hover:-translate-y-1;
+            }
+            .btn-primary {
+                @apply bg-primary hover:bg-primary/90 text-white font-medium py-2 px-4 rounded-none transition-all duration-300 transform hover:translate-x-1 focus:outline-none focus:ring-1 focus:ring-primary;
+            }
+            .btn-secondary {
+                @apply bg-white border border-gray-300 hover:bg-gray-50 text-gray-800 font-medium py-2 px-4 rounded-none transition-all duration-300 transform hover:translate-x-1 focus:outline-none focus:ring-1 focus:ring-gray-300;
+            }
+            .btn-danger {
+                @apply bg-danger hover:bg-danger/90 text-white font-medium py-2 px-4 rounded-none transition-all duration-300 transform hover:translate-x-1 focus:outline-none focus:ring-1 focus:ring-danger;
+            }
+            .input-field {
+                @apply w-full px-4 py-2 border border-gray-300 bg-white focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-all duration-300;
+            }
+            .table-header {
+                @apply px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200;
+            }
+            .table-cell {
+                @apply px-6 py-4 whitespace-nowrap text-sm text-gray-900 border-b border-gray-100;
+            }
+            .badge {
+                @apply inline-flex items-center px-2.5 py-0.5 text-xs font-medium;
+            }
+            .badge-danger {
+                @apply bg-red-50 text-red-800;
+            }
+            .badge-success {
+                @apply bg-green-50 text-green-800;
+            }
+            .badge-warning {
+                @apply bg-yellow-50 text-yellow-800;
+            }
+            .sidebar-link {
+                @apply flex items-center px-4 py-3 text-gray-700 hover:bg-gray-50 transition-all duration-300;
+            }
+            .sidebar-link.active {
+                @apply bg-gray-50 text-primary border-l-2 border-primary;
+            }
+            .stat-card {
+                @apply bg-white p-6 border border-gray-100 card-hover;
+            }
+            .section-title {
+                @apply text-2xl font-light text-gray-800 mb-6 relative inline-block;
+            }
+            .section-title::after {
+                content: '';
+                @apply absolute bottom-0 left-0 w-16 h-px bg-primary mt-2;
+            }
+            .form-label {
+                @apply block text-sm font-medium text-gray-700 mb-1;
+            }
+            .form-group {
+                @apply mb-4;
+            }
+            
+            /* 添加呼吸动画效果类 */
+            .editing-breathing-bg {
+                animation: breathing-bg 2s ease-in-out infinite;
+            }
+            
+            @keyframes breathing-bg {
+                0%, 100% {
+                    background-color: rgba(226, 232, 240, 0.3);
+                }
+                50% {
+                    background-color: rgba(226, 232, 240, 0.8);
+                }
+            }
+        }
+    </style>
+</head>
+<body class="bg-white font-sans text-gray-800">
+    <!-- 自定义鼠标指示器 -->
+    <div id="custom-cursor" class="fixed w-6 h-6 border border-gray-400 pointer-events-none mix-blend-difference z-50 transform -translate-x-1/2 -translate-y-1/2 opacity-0 transition-opacity duration-300"></div>
+
+    <div class="flex h-screen overflow-hidden">
+        <!-- 侧边导航栏 -->
+        <aside class="hidden md:flex md:flex-col w-64 border-r border-gray-100 bg-white">
+            <div class="flex items-center justify-center h-16 border-b border-gray-100">
+                <h1 class="text-xl font-light text-gray-800 tracking-wider">客户欠款记账系统</h1>
+            </div>
+            
+            <!-- 几何线条装饰 -->
+            <div class="absolute left-0 top-16 w-1 h-16 bg-primary"></div>
+            <div class="absolute left-0 top-32 w-16 h-1 bg-primary"></div>
+            
+            <div class="flex flex-col flex-grow p-4 overflow-y-auto">
+                <nav class="flex-1 space-y-1 mt-8">
+                    <button id="nav-dashboard" class="sidebar-link active w-full">
+                        <i class="fa fa-dashboard mr-3 text-gray-400"></i>
+                        <span>仪表盘</span>
+                    </button>
+                    <button id="nav-customers" class="sidebar-link w-full">
+                        <i class="fa fa-users mr-3 text-gray-400"></i>
+                        <span>客户管理</span>
+                    </button>
+                    <button id="nav-transactions" class="sidebar-link w-full">
+                        <i class="fa fa-exchange mr-3 text-gray-400"></i>
+                        <span>交易记录</span>
+                    </button>
+                    <button id="nav-history" class="sidebar-link w-full">
+                        <i class="fa fa-history mr-3 text-gray-400"></i>
+                        <span>历史记录</span>
+                    </button>
+                </nav>
+            </div>
+            
+            <!-- 底部线条装饰 -->
+            <div class="absolute left-0 bottom-16 w-16 h-1 bg-gray-200"></div>
+            <div class="absolute left-0 bottom-0 w-1 h-16 bg-gray-200"></div>
+            
+            <div class="p-4 border-t border-gray-100">
+                <div id="user-profile" class="flex items-center hidden">
+                    <div class="flex-shrink-0">
+                        <i class="fa fa-user-circle text-2xl text-gray-400"></i>
+                    </div>
+                    <div class="ml-3">
+                        <p id="user-name" class="text-sm font-medium text-gray-700">管理员</p>
+                        <p id="user-email" class="text-xs font-medium text-gray-500">admin@example.com</p>
+                    </div>
+                </div>
+                <div id="login-prompt" class="text-center">
+                    <button id="show-login-btn" class="btn-primary text-sm">登录 / 注册</button>
+                </div>
+            </div>
+        </aside>
+
+        <!-- 移动端导航菜单按钮 -->
+        <div class="md:hidden fixed bottom-6 right-6 z-50">
+            <button id="mobile-menu-btn" class="bg-white border border-gray-200 text-gray-800 p-3 shadow-sm hover:shadow-md transition-all duration-300">
+                <i class="fa fa-bars"></i>
+            </button>
+        </div>
+
+        <!-- 移动端导航菜单 -->
+        <div id="mobile-menu" class="fixed inset-0 bg-white z-40 hidden">
+            <div class="absolute right-0 top-0 bottom-0 w-64 bg-white shadow-lg transform transition-transform duration-300 translate-x-full" id="mobile-menu-content">
+                <div class="flex items-center justify-between p-4 border-b border-gray-100">
+                    <h1 class="text-xl font-light text-gray-800">客户欠款记账系统</h1>
+                    <button id="close-mobile-menu" class="text-gray-500 hover:text-gray-700">
+                        <i class="fa fa-times"></i>
+                    </button>
+                </div>
+                <nav class="p-4 space-y-1 mt-8">
+                    <button class="mobile-nav-btn w-full sidebar-link active">
+                        <i class="fa fa-dashboard mr-3 text-gray-400"></i>
+                        <span>仪表盘</span>
+                    </button>
+                    <button class="mobile-nav-btn w-full sidebar-link">
+                        <i class="fa fa-users mr-3 text-gray-400"></i>
+                        <span>客户管理</span>
+                    </button>
+                    <button class="mobile-nav-btn w-full sidebar-link">
+                        <i class="fa fa-exchange mr-3 text-gray-400"></i>
+                        <span>交易记录</span>
+                    </button>
+                    <button class="mobile-nav-btn w-full sidebar-link">
+                        <i class="fa fa-history mr-3 text-gray-400"></i>
+                        <span>历史记录</span>
+                    </button>
+                </nav>
+            </div>
+        </div>
+
+        <!-- 主内容区 -->
+        <main class="flex-1 overflow-y-auto bg-white p-4 md:p-8">
+            <!-- 顶部搜索栏 -->
+            <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-8">
+                <div class="flex items-center mb-4 md:mb-0">
+                    <h2 id="page-title" class="section-title">仪表盘</h2>
+                </div>
+                <div class="relative w-full md:w-64">
+                    <input type="text" id="search-input" placeholder="搜索..." class="input-field pl-10 pr-4 py-2 w-full">
+                    <i class="fa fa-search absolute left-3 top-3 text-gray-400"></i>
+                </div>
+            </div>
+
+            <!-- 页面内容区 -->
+            <div id="page-content">
+                <!-- 仪表盘页面 -->
+                <div id="dashboard-page" class="page-content animate-fade-in">
+                    <!-- 统计卡片 -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                        <div class="stat-card">
+                            <div class="flex items-center">
+                                <div class="p-3 bg-gray-50 text-gray-600 mr-4">
+                                    <i class="fa fa-users text-xl"></i>
+                                </div>
+                                <div>
+                                    <p class="text-xs text-gray-500 uppercase tracking-wider">总客户数</p>
+                                    <p id="total-customers" class="text-2xl font-light text-gray-800">0</p>
+                                </div>
+                            </div>
+                            <div class="line-element w-1/4 mt-4"></div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="flex items-center">
+                                <div class="p-3 bg-gray-50 text-gray-600 mr-4">
+                                    <i class="fa fa-money text-xl"></i>
+                                </div>
+                                <div>
+                                    <p class="text-xs text-gray-500 uppercase tracking-wider">总欠款金额</p>
+                                    <p id="total-debt" class="text-2xl font-light text-gray-800">€0.00</p>
+                                </div>
+                            </div>
+                            <div class="line-element w-1/4 mt-4"></div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="flex items-center">
+                                <div class="p-3 bg-gray-50 text-gray-600 mr-4">
+                                    <i class="fa fa-credit-card text-xl"></i>
+                                </div>
+                                <div>
+                                    <p class="text-xs text-gray-500 uppercase tracking-wider">本月还款</p>
+                                    <p id="monthly-payment" class="text-2xl font-light text-gray-800">€0.00</p>
+                                </div>
+                            </div>
+                            <div class="line-element w-1/4 mt-4"></div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="flex items-center">
+                                <div class="p-3 bg-gray-50 text-gray-600 mr-4">
+                                    <i class="fa fa-exclamation-triangle text-xl"></i>
+                                </div>
+                                <div>
+                                    <p class="text-xs text-gray-500 uppercase tracking-wider">逾期欠款</p>
+                                    <p id="overdue-debt" class="text-2xl font-light text-gray-800">€0.00</p>
+                                </div>
+                            </div>
+                            <div class="line-element w-1/4 mt-4"></div>
+                        </div>
+                    </div>
+
+                    <!-- 图表区域 -->
+                    <div class="grid grid-cols-1 lg:grid-cols-1 gap-8 mb-8">
+                        <div class="bg-white p-6 border border-gray-100 card-hover">
+                            <h3 class="text-lg font-light text-gray-800 mb-4">欠款趋势</h3>
+                            <div class="line-element w-1/4"></div>
+                            <div class="h-64 mt-6">
+                                <canvas id="debt-trend-chart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 最近交易 -->
+                    <div class="bg-white p-6 border border-gray-100 card-hover">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-lg font-light text-gray-800">最近交易</h3>
+                            <a href="#" id="view-all-history" class="text-primary hover:text-primary/80 text-sm font-medium flex items-center">
+                                <span>查看全部</span>
+                                <i class="fa fa-long-arrow-right ml-2"></i>
+                            </a>
+                        </div>
+                        <div class="line-element w-1/4"></div>
+                        <div class="overflow-x-auto mt-6">
+                            <table class="min-w-full">
+                                <thead>
+                                    <tr>
+                                        <th scope="col" class="table-header">客户</th>
+                                        <th scope="col" class="table-header">类型</th>
+                                        <th scope="col" class="table-header">金额</th>
+                                        <th scope="col" class="table-header">日期</th>
+                                        <th scope="col" class="table-header">状态</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="recent-transactions" class="divide-y divide-gray-100">
+                                    <!-- 最近交易记录将通过JavaScript动态生成 -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 客户管理页面 -->
+                <div id="customers-page" class="page-content hidden animate-fade-in">
+                    <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-8">
+                        <h3 class="section-title">客户管理</h3>
+                        <button id="add-customer-btn" class="btn-primary flex items-center">
+                            <i class="fa fa-plus mr-2"></i>
+                            <span>添加客户</span>
+                        </button>
+                    </div>
+
+                    <!-- 客户列表 -->
+                    <div class="bg-white border border-gray-100 card-hover">
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full">
+                                <thead>
+                                    <tr>
+                                        <th scope="col" class="table-header">客户名称</th>
+                                        <th scope="col" class="table-header">联系方式</th>
+                                        <th scope="col" class="table-header">总欠款</th>
+                                        <th scope="col" class="table-header">剩余欠款</th>
+                                        <th scope="col" class="table-header">操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="customers-list" class="divide-y divide-gray-100">
+                                    <!-- 客户列表将通过JavaScript动态生成 -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 交易记录页面 -->
+                <div id="transactions-page" class="page-content hidden animate-fade-in">
+                    <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-8">
+                        <h3 class="section-title">交易记录</h3>
+                        <div class="flex space-x-4 mt-4 md:mt-0">
+                            <button id="add-debt-btn" class="btn-primary flex items-center">
+                                <i class="fa fa-plus mr-2"></i>
+                                <span>添加欠款</span>
+                            </button>
+                            <button id="add-payment-btn" class="btn-primary flex items-center">
+                                <i class="fa fa-plus mr-2"></i>
+                                <span>添加还款</span>
+                            </button>
+                            <button id="print-transactions-btn" class="btn-secondary flex items-center">
+                                <i class="fa fa-print mr-2"></i>
+                                <span>打印</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- 交易记录筛选 -->
+                    <div class="flex flex-wrap gap-4 mb-6">
+                        <div class="relative">
+                            <select id="transaction-type-filter" class="input-field pl-4 pr-10 appearance-none">
+                                <option value="all">全部类型</option>
+                                <option value="debt">欠款记录</option>
+                                <option value="payment">还款记录</option>
+                            </select>
+                            <i class="fa fa-chevron-down absolute right-3 top-3 text-gray-400 pointer-events-none"></i>
+                        </div>
+                        <div class="relative">
+                            <select id="transaction-customer-filter" class="input-field pl-4 pr-10 appearance-none">
+                                <option value="all">所有客户</option>
+                                <!-- 客户选项将通过JavaScript动态生成 -->
+                            </select>
+                            <i class="fa fa-chevron-down absolute right-3 top-3 text-gray-400 pointer-events-none"></i>
+                        </div>
+                        <div class="relative">
+                            <select id="transaction-status-filter" class="input-field pl-4 pr-10 appearance-none">
+                                <option value="all">所有状态</option>
+                                <option value="未还清">未还清</option>
+                                <option value="部分还清">部分还清</option>
+                                <option value="已还清">已还清</option>
+                            </select>
+                            <i class="fa fa-chevron-down absolute right-3 top-3 text-gray-400 pointer-events-none"></i>
+                        </div>
+                    </div>
+
+                    <!-- 交易记录列表 -->
+                    <div class="bg-white border border-gray-100 card-hover">
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full" id="transactions-table">
+                                <thead>
+                                    <tr>
+                                        <th scope="col" class="table-header">类型</th>
+                                        <th scope="col" class="table-header">客户</th>
+                                        <th scope="col" class="table-header">金额</th>
+                                        <th scope="col" class="table-header">日期</th>
+                                        <th scope="col" class="table-header">相关信息</th>
+                                        <th scope="col" class="table-header">状态</th>
+                                        <th scope="col" class="table-header">操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="transactions-list" class="divide-y divide-gray-100">
+                                    <!-- 交易记录列表将通过JavaScript动态生成 -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 历史记录页面 -->
+                <div id="history-page" class="page-content hidden animate-fade-in">
+                    <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-8">
+                        <h3 class="section-title">历史记录</h3>
+                        <div class="flex space-x-4 mt-4 md:mt-0">
+                            <div class="relative">
+                                <select id="history-filter" class="input-field pl-4 pr-10 appearance-none">
+                                    <option value="all">全部记录</option>
+                                    <option value="debt">欠款记录</option>
+                                    <option value="payment">还款记录</option>
+                                </select>
+                                <i class="fa fa-chevron-down absolute right-3 top-3 text-gray-400 pointer-events-none"></i>
+                            </div>
+                            <div class="relative">
+                                <select id="history-customer-filter" class="input-field pl-4 pr-10 appearance-none">
+                                    <option value="all">所有客户</option>
+                                    <!-- 客户选项将通过JavaScript动态生成 -->
+                                </select>
+                                <i class="fa fa-chevron-down absolute right-3 top-3 text-gray-400 pointer-events-none"></i>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 历史记录列表 -->
+                    <div class="bg-white border border-gray-100 card-hover">
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full">
+                                <thead>
+                                    <tr>
+                                        <th scope="col" class="table-header">客户</th>
+                                        <th scope="col" class="table-header">类型</th>
+                                        <th scope="col" class="table-header">金额</th>
+                                        <th scope="col" class="table-header">日期</th>
+                                        <th scope="col" class="table-header">详情</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="history-list" class="divide-y divide-gray-100">
+                                    <!-- 历史记录列表将通过JavaScript动态生成 -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- 添加客户模态框 -->
+    <div id="add-customer-modal" class="fixed inset-0 bg-white bg-opacity-95 z-50 flex items-center justify-center hidden">
+        <div class="bg-white border border-gray-200 shadow-sm w-full max-w-md mx-4 animate-slide-in transform transition-all duration-300">
+            <div class="p-6 border-b border-gray-100">
+                <h3 class="text-lg font-light text-gray-800">添加客户</h3>
+                <div class="line-element w-1/4 mt-4"></div>
+            </div>
+            <form id="add-customer-form" class="p-6">
+                <div class="form-group">
+                    <label for="customer-name" class="form-label">客户名称</label>
+                    <input type="text" id="customer-name" name="name" class="input-field" placeholder="请输入客户名称" required>
+                </div>
+                <div class="form-group">
+                    <label for="customer-contact" class="form-label">联系方式</label>
+                    <input type="text" id="customer-contact" name="contact" class="input-field" placeholder="请输入联系方式" required>
+                </div>
+                <div class="form-group">
+                    <label for="customer-address" class="form-label">地址</label>
+                    <input type="text" id="customer-address" name="address" class="input-field" placeholder="请输入地址">
+                </div>
+                <div class="form-group">
+                    <label for="customer-notes" class="form-label">备注</label>
+                    <textarea id="customer-notes" name="notes" rows="3" class="input-field" placeholder="请输入备注信息"></textarea>
+                </div>
+                <div class="flex justify-end space-x-3 mt-8">
+                    <button type="button" class="btn-secondary close-modal">取消</button>
+                    <button type="submit" class="btn-primary">保存</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 添加欠款模态框 -->
+    <div id="add-debt-modal" class="fixed inset-0 bg-white bg-opacity-95 z-50 flex items-center justify-center hidden">
+        <div class="bg-white border border-gray-200 shadow-sm w-full max-w-md mx-4 animate-slide-in transform transition-all duration-300">
+            <div class="p-6 border-b border-gray-100">
+                <h3 class="text-lg font-light text-gray-800">添加欠款记录</h3>
+                <div class="line-element w-1/4 mt-4"></div>
+            </div>
+            <form id="add-debt-form" class="p-6">
+                <div class="form-group">
+                    <label for="debt-customer" class="form-label">客户</label>
+                    <select id="debt-customer" name="customerId" class="input-field" required>
+                        <option value="">请选择客户</option>
+                        <!-- 客户选项将通过JavaScript动态生成 -->
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="debt-amount" class="form-label">欠款金额</label>
+                    <input type="number" id="debt-amount" name="amount" class="input-field" placeholder="请输入欠款金额" step="0.01" min="0" required>
+                </div>
+                <div class="form-group">
+                    <label for="debt-date" class="form-label">欠款日期</label>
+                    <input type="date" id="debt-date" name="date" class="input-field" required>
+                </div>
+                <div class="form-group">
+                    <label for="debt-due-date" class="form-label">预计还款日期</label>
+                    <input type="date" id="debt-due-date" name="dueDate" class="input-field">
+                </div>
+                <div class="form-group">
+                    <label for="debt-reason" class="form-label">欠款事由</label>
+                    <input type="text" id="debt-reason" name="reason" class="input-field" placeholder="请输入欠款事由" required>
+                </div>
+                <div class="form-group">
+                    <label for="debt-notes" class="form-label">备注</label>
+                    <textarea id="debt-notes" name="notes" rows="3" class="input-field" placeholder="请输入备注信息"></textarea>
+                </div>
+                <div class="flex justify-end space-x-3 mt-8">
+                    <button type="button" class="btn-secondary close-modal">取消</button>
+                    <button type="submit" class="btn-primary">保存</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 添加还款模态框 -->
+    <div id="add-payment-modal" class="fixed inset-0 bg-white bg-opacity-95 z-50 flex items-center justify-center hidden">
+        <div class="bg-white border border-gray-200 shadow-sm w-full max-w-md mx-4 animate-slide-in transform transition-all duration-300">
+            <div class="p-6 border-b border-gray-100">
+                <h3 class="text-lg font-light text-gray-800">添加还款记录</h3>
+                <div class="line-element w-1/4 mt-4"></div>
+            </div>
+            <form id="add-payment-form" class="p-6">
+                <div class="form-group">
+                    <label for="payment-customer" class="form-label">客户</label>
+                    <select id="payment-customer" name="customerId" class="input-field" required>
+                        <option value="">请选择客户</option>
+                        <!-- 客户选项将通过JavaScript动态生成 -->
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="payment-amount" class="form-label">还款金额</label>
+                    <input type="number" id="payment-amount" name="amount" class="input-field" placeholder="请输入还款金额" step="0.01" min="0" required>
+                </div>
+                <div class="form-group">
+                    <label for="payment-date" class="form-label">还款日期</label>
+                    <input type="date" id="payment-date" name="date" class="input-field" required>
+                </div>
+                <div class="form-group">
+                    <label for="payment-method" class="form-label">还款方式</label>
+                    <select id="payment-method" name="method" class="input-field" required>
+                        <option value="cash">现金</option>
+                        <option value="bank">银行转账</option>
+                        <option value="other">其他</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="payment-notes" class="form-label">备注</label>
+                    <textarea id="payment-notes" name="notes" rows="3" class="input-field" placeholder="请输入备注信息"></textarea>
+                </div>
+                <div class="flex justify-end space-x-3 mt-8">
+                    <button type="button" class="btn-secondary close-modal">取消</button>
+                    <button type="submit" class="btn-primary">保存</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 客户详情模态框 -->
+    <div id="customer-detail-modal" class="fixed inset-0 bg-white bg-opacity-95 z-50 flex items-center justify-center hidden">
+        <div class="bg-white border border-gray-200 shadow-sm w-full max-w-4xl mx-4 animate-slide-in transform transition-all duration-300 max-h-[90vh] overflow-y-auto">
+            <div class="p-6 border-b border-gray-100">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-lg font-light text-gray-800">客户详情</h3>
+                    <button class="close-modal text-gray-500 hover:text-gray-700">
+                        <i class="fa fa-times"></i>
+                    </button>
+                </div>
+                <div class="line-element w-1/4 mt-4"></div>
+            </div>
+            <div class="p-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                    <div>
+                        <h4 class="text-md font-medium text-gray-800 mb-4">基本信息</h4>
+                        <div id="customer-basic-info" class="space-y-3">
+                            <!-- 客户基本信息将通过JavaScript动态生成 -->
+                        </div>
+                    </div>
+                    <div>
+                        <h4 class="text-md font-medium text-gray-800 mb-4">财务概览</h4>
+                        <div id="customer-financial-info" class="space-y-3">
+                            <!-- 客户财务信息将通过JavaScript动态生成 -->
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mb-8">
+                    <div class="flex items-center justify-between mb-4">
+                        <h4 class="text-md font-medium text-gray-800">欠款记录</h4>
+                        <button id="add-debt-from-detail" class="btn-primary py-1 px-3 text-sm flex items-center">
+                            <i class="fa fa-plus mr-1"></i> 添加欠款
+                        </button>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full">
+                            <thead>
+                                <tr>
+                                    <th scope="col" class="table-header">欠款金额</th>
+                                    <th scope="col" class="table-header">欠款日期</th>
+                                    <th scope="col" class="table-header">预计还款日期</th>
+                                    <th scope="col" class="table-header">事由</th>
+                                    <th scope="col" class="table-header">状态</th>
+                                </tr>
+                            </thead>
+                            <tbody id="customer-debts-list" class="divide-y divide-gray-100">
+                                <!-- 客户欠款记录将通过JavaScript动态生成 -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div>
+                    <div class="flex items-center justify-between mb-4">
+                        <h4 class="text-md font-medium text-gray-800">还款记录</h4>
+                        <button id="add-payment-from-detail" class="btn-primary py-1 px-3 text-sm flex items-center">
+                            <i class="fa fa-plus mr-1"></i> 添加还款
+                        </button>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full">
+                            <thead>
+                                <tr>
+                                    <th scope="col" class="table-header">还款金额</th>
+                                    <th scope="col" class="table-header">还款日期</th>
+                                    <th scope="col" class="table-header">还款方式</th>
+                                    <th scope="col" class="table-header">备注</th>
+                                    <th scope="col" class="table-header">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="customer-payments-list" class="divide-y divide-gray-100">
+                                <!-- 客户还款记录将通过JavaScript动态生成 -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript -->
+    <script>
+        // 注册 Service Worker
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/service-worker.js')
+                    .then(registration => {
+                        console.log('Service Worker 注册成功:', registration.scope);
+                    })
+                    .catch(error => {
+                        console.log('Service Worker 注册失败:', error);
+                    });
+            });
+        }
+        // 数据存储
+        const db = {
+            customers: [],
+            debts: [],
+            payments: []
+        };
+
+        // 初始化数据
+        function initData() {
+            // 从localStorage加载数据
+            const savedCustomers = localStorage.getItem('customers');
+            const savedDebts = localStorage.getItem('debts');
+            const savedPayments = localStorage.getItem('payments');
+
+            if (savedCustomers) db.customers = JSON.parse(savedCustomers);
+            if (savedDebts) db.debts = JSON.parse(savedDebts);
+            if (savedPayments) db.payments = JSON.parse(savedPayments);
+
+            // 如果没有数据，添加一些示例数据
+            if (db.customers.length === 0) {
+                const today = new Date().toISOString().split('T')[0];
+                const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+                const lastWeek = new Date(Date.now() - 604800000).toISOString().split('T')[0];
+                const nextWeek = new Date(Date.now() + 604800000).toISOString().split('T')[0];
+
+                // 添加示例客户
+                const customer1 = addCustomer({
+                    name: '张三',
+                    contact: '13800138000',
+                    address: '北京市朝阳区',
+                    notes: '重要客户'
+                });
+
+                const customer2 = addCustomer({
+                    name: '李四',
+                    contact: '13900139000',
+                    address: '上海市浦东新区',
+                    notes: ''
+                });
+
+                const customer3 = addCustomer({
+                    name: '王五',
+                    contact: '13700137000',
+                    address: '广州市天河区',
+                    notes: '新客户'
+                });
+
+                // 添加示例欠款
+                addDebt({
+                    customerId: customer1.id,
+                    amount: 5000,
+                    date: lastWeek,
+                    dueDate: nextWeek,
+                    reason: '货款',
+                    notes: '这批货是紧急订单'
+                });
+
+                addDebt({
+                    customerId: customer2.id,
+                    amount: 3000,
+                    date: yesterday,
+                    dueDate: nextWeek,
+                    reason: '服务费',
+                    notes: ''
+                });
+
+                addDebt({
+                    customerId: customer1.id,
+                    amount: 2000,
+                    date: lastWeek,
+                    dueDate: yesterday,
+                    reason: '设备款',
+                    notes: '已逾期'
+                });
+
+                // 添加示例还款
+                addPayment({
+                    customerId: customer1.id,
+                    amount: 1000,
+                    date: yesterday,
+                    method: 'cash',
+                    notes: '部分还款'
+                });
+
+                addPayment({
+                    customerId: customer2.id,
+                    amount: 3000,
+                    date: today,
+                    method: 'wechat',
+                    notes: '全额还款'
+                });
+            }
+        }
+
+        // 保存数据到localStorage
+        function saveData() {
+            localStorage.setItem('customers', JSON.stringify(db.customers));
+            localStorage.setItem('debts', JSON.stringify(db.debts));
+            localStorage.setItem('payments', JSON.stringify(db.payments));
+        }
+
+        // 生成唯一ID
+        function generateId() {
+            return Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
+        }
+
+        // 客户相关函数
+        function addCustomer(customer) {
+            const newCustomer = {
+                id: generateId(),
+                name: customer.name,
+                contact: customer.contact,
+                address: customer.address || '',
+                notes: customer.notes || '',
+                createdAt: new Date().toISOString()
+            };
+
+            db.customers.push(newCustomer);
+            saveData();
+            return newCustomer;
+        }
+
+        function updateCustomer(id, updates) {
+            const index = db.customers.findIndex(customer => customer.id === id);
+            if (index !== -1) {
+                db.customers[index] = { ...db.customers[index], ...updates };
+                saveData();
+                return db.customers[index];
+            }
+            return null;
+        }
+
+        function deleteCustomer(id) {
+            // 删除客户
+            db.customers = db.customers.filter(customer => customer.id !== id);
+            
+            // 删除相关的欠款和还款记录
+            db.debts = db.debts.filter(debt => debt.customerId !== id);
+            db.payments = db.payments.filter(payment => payment.customerId !== id);
+            
+            saveData();
+            
+            // 更新UI
+            renderCustomers();
+            renderDebts();
+            renderPayments();
+            renderHistory();
+            updateDashboard();
+            updateCustomerOptions();
+        }
+
+        function getCustomerById(id) {
+            return db.customers.find(customer => customer.id === id);
+        }
+
+        // 欠款相关函数
+        function addDebt(debt) {
+            const newDebt = {
+                id: generateId(),
+                customerId: debt.customerId,
+                amount: parseFloat(debt.amount),
+                date: debt.date,
+                dueDate: debt.dueDate || null,
+                reason: debt.reason,
+                notes: debt.notes || '',
+                status: 'unpaid', // unpaid, partially, paid, overdue
+                createdAt: new Date().toISOString()
+            };
+
+            // 检查是否逾期
+            if (newDebt.dueDate && newDebt.dueDate < new Date().toISOString().split('T')[0]) {
+                newDebt.status = 'overdue';
+            }
+
+            db.debts.push(newDebt);
+            saveData();
+            return newDebt;
+        }
+
+        function updateDebt(id, updates) {
+            const index = db.debts.findIndex(debt => debt.id === id);
+            if (index !== -1) {
+                db.debts[index] = { ...db.debts[index], ...updates };
+                saveData();
+                return db.debts[index];
+            }
+            return null;
+        }
+
+        function deleteDebt(id) {
+            db.debts = db.debts.filter(debt => debt.id !== id);
+            saveData();
+            
+            // 更新UI
+            renderDebts();
+            renderCustomers();
+            renderHistory();
+            updateDashboard();
+        }
+
+        function getDebtsByCustomerId(customerId) {
+            return db.debts.filter(debt => debt.customerId === customerId);
+        }
+
+        // 还款相关函数
+        function addPayment(payment) {
+            const newPayment = {
+                id: generateId(),
+                customerId: payment.customerId,
+                amount: parseFloat(payment.amount),
+                date: payment.date,
+                method: payment.method,
+                notes: payment.notes || '',
+                createdAt: new Date().toISOString()
+            };
+
+            db.payments.push(newPayment);
+            
+            // 更新相关欠款的状态
+            updateDebtStatusAfterPayment(payment.customerId);
+            
+            saveData();
+            return newPayment;
+        }
+
+        function updatePayment(id, updates) {
+            const index = db.payments.findIndex(payment => payment.id === id);
+            if (index !== -1) {
+                db.payments[index] = { ...db.payments[index], ...updates };
+                saveData();
+                return db.payments[index];
+            }
+            return null;
+        }
+
+        function deletePayment(id) {
+            const payment = db.payments.find(p => p.id === id);
+            if (payment) {
+                db.payments = db.payments.filter(payment => payment.id !== id);
+                
+                // 更新相关欠款的状态
+                updateDebtStatusAfterPayment(payment.customerId);
+                
+                saveData();
+                
+                // 更新UI
+                renderPayments();
+                renderCustomers();
+                renderHistory();
+                updateDashboard();
+            }
+        }
+
+        function getPaymentsByCustomerId(customerId) {
+            return db.payments.filter(payment => payment.customerId === customerId);
+        }
+
+        // 更新欠款状态
+        function updateDebtStatusAfterPayment(customerId) {
+            const customerDebts = getDebtsByCustomerId(customerId);
+            const customerPayments = getPaymentsByCustomerId(customerId);
+            
+            const totalDebt = customerDebts.reduce((sum, debt) => sum + debt.amount, 0);
+            const totalPayment = customerPayments.reduce((sum, payment) => sum + payment.amount, 0);
+            
+            if (totalPayment >= totalDebt) {
+                // 全部还清
+                customerDebts.forEach(debt => {
+                    updateDebt(debt.id, { status: 'paid' });
+                });
+            } else if (totalPayment > 0) {
+                // 部分还款
+                customerDebts.forEach(debt => {
+                    if (debt.status === 'unpaid' || debt.status === 'overdue') {
+                        updateDebt(debt.id, { status: 'partially' });
+                    }
+                });
+            }
+            
+            // 检查是否有逾期未还的欠款
+            const today = new Date().toISOString().split('T')[0];
+            customerDebts.forEach(debt => {
+                if (debt.dueDate && debt.dueDate < today && debt.status !== 'paid') {
+                    updateDebt(debt.id, { status: 'overdue' });
+                }
+            });
+        }
+
+        // 计算客户总欠款
+        function calculateTotalDebt(customerId) {
+            return db.debts
+                .filter(debt => debt.customerId === customerId)
+                .reduce((sum, debt) => sum + debt.amount, 0);
+        }
+
+        // 计算客户已还款金额
+        function calculateTotalPayment(customerId) {
+            return db.payments
+                .filter(payment => payment.customerId === customerId)
+                .reduce((sum, payment) => sum + payment.amount, 0);
+        }
+
+        // 计算客户剩余欠款
+        function calculateRemainingDebt(customerId) {
+            const totalDebt = calculateTotalDebt(customerId);
+            const totalPayment = calculateTotalPayment(customerId);
+            return Math.max(0, totalDebt - totalPayment);
+        }
+
+        // 计算逾期欠款
+        function calculateOverdueDebt() {
+            const today = new Date().toISOString().split('T')[0];
+            return db.debts
+                .filter(debt => debt.dueDate && debt.dueDate < today && debt.status !== 'paid')
+                .reduce((sum, debt) => sum + debt.amount, 0);
+        }
+
+        // 计算本月还款
+        function calculateMonthlyPayment() {
+            const today = new Date();
+            const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+            
+            return db.payments
+                .filter(payment => new Date(payment.date) >= monthStart)
+                .reduce((sum, payment) => sum + payment.amount, 0);
+        }
+
+        // 格式化货币
+        function formatCurrency(amount) {
+            return '€' + amount.toFixed(2).replace(/\d(?=(\d{3})+\.)/g, '$&,');
+        }
+
+        // 渲染客户列表
+        function renderCustomers() {
+            const customersList = document.getElementById('customers-list');
+            customersList.innerHTML = '';
+            
+            if (db.customers.length === 0) {
+                customersList.innerHTML = `
+                    <tr>
+                        <td colspan="5" class="px-6 py-4 text-center text-gray-500">暂无客户数据</td>
+                    </tr>
+                `;
+                return;
+            }
+            
+            db.customers.forEach(customer => {
+                const totalDebt = calculateTotalDebt(customer.id);
+                const remainingDebt = calculateRemainingDebt(customer.id);
+
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td class="table-cell">
+                        <div class="flex items-center">
+                            <div class="flex-shrink-0 h-10 w-10 flex items-center justify-center bg-gray-100 text-gray-500">
+                                <i class="fa fa-user"></i>
+                            </div>
+                            <div class="ml-4">
+                                <div class="text-sm font-medium text-gray-800">${customer.name}</div>
+                                <div class="text-xs text-gray-500">${customer.contact}</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="table-cell">${customer.contact}</td>
+                    <td class="table-cell">${formatCurrency(totalDebt)}</td>
+                    <td class="table-cell ${remainingDebt > 0 ? 'text-danger' : 'text-success'}">${formatCurrency(remainingDebt)}</td>
+                    <td class="table-cell">
+                        <div class="flex space-x-2">
+                            <button class="view-customer-btn text-primary hover:text-primary/80" data-id="${customer.id}">
+                                <i class="fa fa-eye"></i>
+                            </button>
+                            <button class="delete-customer-btn text-gray-400 hover:text-danger" data-id="${customer.id}">
+                                <i class="fa fa-trash"></i>
+                            </button>
+                        </div>
+                    </td>
+                `;
+                customersList.appendChild(row);
+            });
+            
+            // 添加事件监听
+            document.querySelectorAll('.view-customer-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const customerId = btn.getAttribute('data-id');
+                    showCustomerDetail(customerId);
+                });
+            });
+            
+            document.querySelectorAll('.delete-customer-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const customerId = btn.getAttribute('data-id');
+                    if (confirm('确定要删除此客户吗？相关的欠款和还款记录也将被删除。')) {
+                        deleteCustomer(customerId);
+                    }
+                });
+            });
+        }
+
+        // 渲染欠款列表
+        function renderDebts() {
+            const debtsList = document.getElementById('debts-list');
+            debtsList.innerHTML = '';
+            
+            if (db.debts.length === 0) {
+                debtsList.innerHTML = `
+                    <tr>
+                        <td colspan="7" class="px-6 py-4 text-center text-gray-500">暂无欠款记录</td>
+                    </tr>
+                `;
+                return;
+            }
+            
+            db.debts.forEach(debt => {
+                const customer = getCustomerById(debt.customerId);
+
+                let statusBadge = '';
+                if (debt.status === 'paid') {
+                    statusBadge = '<span class="badge badge-success">已还清</span>';
+                } else if (debt.status === 'overdue') {
+                    statusBadge = '<span class="badge badge-danger">已逾期</span>';
+                } else if (debt.status === 'partially') {
+                    statusBadge = '<span class="badge badge-warning">部分还款</span>';
+                } else {
+                    statusBadge = '<span class="badge badge-warning">未还款</span>';
+                }
+
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td class="table-cell">${customer ? customer.name : '未知客户'}</td>
+                    <td class="table-cell">${formatCurrency(debt.amount)}</td>
+                    <td class="table-cell">${debt.date}</td>
+                    <td class="table-cell">${debt.dueDate || '-'}</td>
+                    <td class="table-cell">${debt.reason}</td>
+                    <td class="table-cell">${statusBadge}</td>
+                    <td class="table-cell">
+                        <div class="flex space-x-2">
+                            <button class="delete-debt-btn text-gray-400 hover:text-danger" data-id="${debt.id}">
+                                <i class="fa fa-trash"></i>
+                            </button>
+                        </div>
+                    </td>
+                `;
+                debtsList.appendChild(row);
+            });
+            
+            // 添加事件监听
+            document.querySelectorAll('.delete-debt-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const debtId = btn.getAttribute('data-id');
+                    if (confirm('确定要删除此欠款记录吗？')) {
+                        deleteDebt(debtId);
+                    }
+                });
+            });
+        }
+
+        // 渲染还款列表
+        function renderPayments() {
+            const paymentsList = document.getElementById('payments-list');
+            paymentsList.innerHTML = '';
+            
+            if (db.payments.length === 0) {
+                paymentsList.innerHTML = `
+                    <tr>
+                        <td colspan="6" class="px-6 py-4 text-center text-gray-500">暂无还款记录</td>
+                    </tr>
+                `;
+                return;
+            }
+            
+            db.payments.forEach(payment => {
+                const customer = getCustomerById(payment.customerId);
+                
+                let methodText = '';
+                switch (payment.method) {
+                    case 'cash': methodText = '现金'; break;
+                    case 'bank': methodText = '银行转账'; break;
+                    case 'wechat': methodText = '微信支付'; break;
+                    case 'alipay': methodText = '支付宝'; break;
+                    default: methodText = '其他';
+                }
+
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td class="table-cell">${customer ? customer.name : '未知客户'}</td>
+                    <td class="table-cell">${formatCurrency(payment.amount)}</td>
+                    <td class="table-cell">${payment.date}</td>
+                    <td class="table-cell">${methodText}</td>
+                    <td class="table-cell">${payment.notes || '-'}</td>
+                    <td class="table-cell">
+                        <div class="flex space-x-2">
+                            <button class="print-receipt-btn text-primary hover:text-primary/80" data-id="${payment.id}">
+                                <i class="fa fa-print"></i>
+                            </button>
+                            <button class="delete-payment-btn text-gray-400 hover:text-danger" data-id="${payment.id}">
+                                <i class="fa fa-trash"></i>
+                            </button>
+                        </div>
+                    </td>
+                `;
+                paymentsList.appendChild(row);
+            });
+            
+            // 添加事件监听
+            document.querySelectorAll('.delete-payment-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const paymentId = btn.getAttribute('data-id');
+                    if (confirm('确定要删除此还款记录吗？')) {
+                        deletePayment(paymentId);
+                    }
+                });
+            });
+            
+            document.querySelectorAll('.print-receipt-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const paymentId = btn.getAttribute('data-id');
+                    printReceipt(paymentId);
+                });
+            });
+        }
+
+        // 渲染历史记录
+        function renderHistory(filter = 'all', customerId = 'all') {
+            const historyList = document.getElementById('history-list');
+            historyList.innerHTML = '';
+            
+            // 合并欠款和还款记录
+            let history = [];
+            
+            db.debts.forEach(debt => {
+                if (filter === 'all' || filter === 'debt') {
+                    if (customerId === 'all' || debt.customerId === customerId) {
+                        history.push({
+                            id: debt.id,
+                            type: 'debt',
+                            customerId: debt.customerId,
+                            amount: debt.amount,
+                            date: debt.date,
+                            detail: debt.reason,
+                            status: debt.status
+                        });
+                    }
+                }
+            });
+            
+            db.payments.forEach(payment => {
+                if (filter === 'all' || filter === 'payment') {
+                    if (customerId === 'all' || payment.customerId === customerId) {
+                        history.push({
+                            id: payment.id,
+                            type: 'payment',
+                            customerId: payment.customerId,
+                            amount: payment.amount,
+                            date: payment.date,
+                            detail: payment.notes || '-',
+                            method: payment.method
+                        });
+                    }
+                }
+            });
+            
+            // 按日期排序
+            history.sort((a, b) => new Date(b.date) - new Date(a.date));
+            
+            if (history.length === 0) {
+                historyList.innerHTML = `
+                    <tr>
+                        <td colspan="5" class="px-6 py-4 text-center text-gray-500">暂无历史记录</td>
+                    </tr>
+                `;
+                return;
+            }
+            
+            history.forEach(record => {
+                const customer = getCustomerById(record.customerId);
+                const row = document.createElement('tr');
+                
+                if (record.type === 'debt') {
+                    let statusBadge = '';
+                    if (record.status === 'paid') {
+                        statusBadge = '<span class="badge badge-success">已还清</span>';
+                    } else if (record.status === 'overdue') {
+                        statusBadge = '<span class="badge badge-danger">已逾期</span>';
+                    } else if (record.status === 'partially') {
+                        statusBadge = '<span class="badge badge-warning">部分还款</span>';
+                    } else {
+                        statusBadge = '<span class="badge badge-warning">未还款</span>';
+                    }
+                    
+                    row.innerHTML = `
+                        <td class="table-cell">${customer ? customer.name : '未知客户'}</td>
+                        <td class="table-cell">
+                            <span class="badge bg-blue-50 text-blue-800">欠款</span>
+                        </td>
+                        <td class="table-cell text-danger">+${formatCurrency(record.amount)}</td>
+                        <td class="table-cell">${record.date}</td>
+                        <td class="table-cell">
+                            <div class="flex items-center">
+                                <span>${record.detail}</span>
+                                <span class="ml-2">${statusBadge}</span>
+                            </div>
+                        </td>
+                    `;
+                } else {
+                    let methodText = '';
+                    switch (record.method) {
+                        case 'cash': methodText = '现金'; break;
+                        case 'bank': methodText = '银行转账'; break;
+                        case 'wechat': methodText = '微信支付'; break;
+                        case 'alipay': methodText = '支付宝'; break;
+                        default: methodText = '其他';
+                    }
+                    
+                    row.innerHTML = `
+                        <td class="table-cell">${customer ? customer.name : '未知客户'}</td>
+                        <td class="table-cell">
+                            <span class="badge bg-green-50 text-green-800">还款</span>
+                        </td>
+                        <td class="table-cell text-success">-${formatCurrency(record.amount)}</td>
+                        <td class="table-cell">${record.date}</td>
+                        <td class="table-cell">
+                            <div class="flex items-center">
+                                <span>${record.detail}</span>
+                                <span class="ml-2 text-xs text-gray-500">(${methodText})</span>
+                            </div>
+                        </td>
+                    `;
+                }
+                
+                historyList.appendChild(row);
+            });
+            
+            // 更新最近交易
+            updateRecentTransactions();
+        }
+
+        // 更新最近交易
+        function updateRecentTransactions() {
+            const recentTransactions = document.getElementById('recent-transactions');
+            recentTransactions.innerHTML = '';
+            
+            // 合并欠款和还款记录
+            let history = [];
+            
+            db.debts.forEach(debt => {
+                history.push({
+                    id: debt.id,
+                    type: 'debt',
+                    customerId: debt.customerId,
+                    amount: debt.amount,
+                    date: debt.date,
+                    status: debt.status
+                });
+            });
+            
+            db.payments.forEach(payment => {
+                history.push({
+                    id: payment.id,
+                    type: 'payment',
+                    customerId: payment.customerId,
+                    amount: payment.amount,
+                    date: payment.date,
+                    method: payment.method
+                });
+            });
+            
+            // 按日期排序并取最近5条
+            history.sort((a, b) => new Date(b.date) - new Date(a.date));
+            const recent = history.slice(0, 5);
+            
+            if (recent.length === 0) {
+                recentTransactions.innerHTML = `
+                    <tr>
+                        <td colspan="5" class="px-6 py-4 text-center text-gray-500">暂无交易记录</td>
+                    </tr>
+                `;
+                return;
+            }
+            
+            recent.forEach(record => {
+                const customer = getCustomerById(record.customerId);
+                const row = document.createElement('tr');
+                
+                if (record.type === 'debt') {
+                    let statusBadge = '';
+                    if (record.status === 'paid') {
+                        statusBadge = '<span class="badge badge-success">已还清</span>';
+                    } else if (record.status === 'overdue') {
+                        statusBadge = '<span class="badge badge-danger">已逾期</span>';
+                    } else if (record.status === 'partially') {
+                        statusBadge = '<span class="badge badge-warning">部分还款</span>';
+                    } else {
+                        statusBadge = '<span class="badge badge-warning">未还款</span>';
+                    }
+                    
+                    row.innerHTML = `
+                        <td class="table-cell">${customer ? customer.name : '未知客户'}</td>
+                        <td class="table-cell">
+                            <span class="badge bg-blue-50 text-blue-800">欠款</span>
+                        </td>
+                        <td class="table-cell text-danger">+${formatCurrency(record.amount)}</td>
+                        <td class="table-cell">${record.date}</td>
+                        <td class="table-cell">${statusBadge}</td>
+                    `;
+                } else {
+                    let methodText = '';
+                    switch (record.method) {
+                        case 'cash': methodText = '现金'; break;
+                        case 'bank': methodText = '银行转账'; break;
+                        case 'wechat': methodText = '微信支付'; break;
+                        case 'alipay': methodText = '支付宝'; break;
+                        default: methodText = '其他';
+                    }
+                    
+                    row.innerHTML = `
+                        <td class="table-cell">${customer ? customer.name : '未知客户'}</td>
+                        <td class="table-cell">
+                            <span class="badge bg-green-50 text-green-800">还款</span>
+                        </td>
+                        <td class="table-cell text-success">-${formatCurrency(record.amount)}</td>
+                        <td class="table-cell">${record.date}</td>
+                        <td class="table-cell">
+                            <span class="text-xs text-gray-500">${methodText}</span>
+                        </td>
+                    `;
+                }
+                
+                recentTransactions.appendChild(row);
+            });
+        }
+
+        // 更新仪表盘
+        function updateDashboard() {
+            // 更新客户总数
+            document.getElementById('total-customers').textContent = db.customers.length;
+            
+            // 更新总欠款金额
+            const totalDebt = db.debts.reduce((sum, debt) => sum + debt.amount, 0);
+            document.getElementById('total-debt').textContent = formatCurrency(totalDebt);
+            
+            // 更新本月还款
+            const monthlyPayment = calculateMonthlyPayment();
+            document.getElementById('monthly-payment').textContent = formatCurrency(monthlyPayment);
+            
+            // 更新逾期欠款
+            const overdueDebt = calculateOverdueDebt();
+            document.getElementById('overdue-debt').textContent = formatCurrency(overdueDebt);
+            
+            // 更新图表
+            updateCharts();
+        }
+
+        // 更新图表
+        function updateCharts() {
+            // 欠款趋势图表
+            const debtTrendCtx = document.getElementById('debt-trend-chart').getContext('2d');
+            
+            // 按月份统计欠款和还款
+            const months = [];
+            const debtData = [];
+            const paymentData = [];
+            
+            // 获取最近6个月的数据
+            for (let i = 5; i >= 0; i--) {
+                const date = new Date();
+                date.setMonth(date.getMonth() - i);
+                
+                const monthYear = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+                months.push(monthYear);
+                
+                // 计算当月欠款
+                const monthlyDebt = db.debts
+                    .filter(debt => debt.date.startsWith(monthYear))
+                    .reduce((sum, debt) => sum + debt.amount, 0);
+                debtData.push(monthlyDebt);
+                
+                // 计算当月还款
+                const monthlyPayment = db.payments
+                    .filter(payment => payment.date.startsWith(monthYear))
+                    .reduce((sum, payment) => sum + payment.amount, 0);
+                paymentData.push(monthlyPayment);
+            }
+            
+            // 销毁旧图表
+            if (window.debtTrendChart) {
+                window.debtTrendChart.destroy();
+            }
+            
+            // 创建新图表
+            window.debtTrendChart = new Chart(debtTrendCtx, {
+                type: 'bar',
+                data: {
+                    labels: months,
+                    datasets: [
+                        {
+                            label: '欠款',
+                            data: debtData,
+                            backgroundColor: 'rgba(229, 62, 62, 0.5)',
+                            borderColor: 'rgba(229, 62, 62, 1)',
+                            borderWidth: 1
+                        },
+                        {
+                            label: '还款',
+                            data: paymentData,
+                            backgroundColor: 'rgba(56, 161, 105, 0.5)',
+                            borderColor: 'rgba(56, 161, 105, 1)',
+                            borderWidth: 1
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function(value) {
+                                    return '¥' + value;
+                                }
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return context.dataset.label + ': ' + formatCurrency(context.raw);
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+            
+            // 客户欠款分布图表已移除
+        }
+
+        // 更新客户选项
+        function updateCustomerOptions() {
+            // 更新欠款表单中的客户选项
+            const debtCustomerSelect = document.getElementById('debt-customer');
+            const paymentCustomerSelect = document.getElementById('payment-customer');
+            const historyCustomerFilter = document.getElementById('history-customer-filter');
+            
+            // 保存当前选中的值
+            const debtSelectedValue = debtCustomerSelect.value;
+            const paymentSelectedValue = paymentCustomerSelect.value;
+            const historySelectedValue = historyCustomerFilter.value;
+            
+            // 清空选项
+            debtCustomerSelect.innerHTML = '<option value="">请选择客户</option>';
+            paymentCustomerSelect.innerHTML = '<option value="">请选择客户</option>';
+            
+            // 添加客户选项
+            db.customers.forEach(customer => {
+                const debtOption = document.createElement('option');
+                debtOption.value = customer.id;
+                debtOption.textContent = customer.name;
+                debtCustomerSelect.appendChild(debtOption);
+                
+                const paymentOption = document.createElement('option');
+                paymentOption.value = customer.id;
+                paymentOption.textContent = customer.name;
+                paymentCustomerSelect.appendChild(paymentOption);
+            });
+            
+            // 恢复选中的值
+            if (debtSelectedValue) debtCustomerSelect.value = debtSelectedValue;
+            if (paymentSelectedValue) paymentCustomerSelect.value = paymentSelectedValue;
+            
+            // 更新历史记录筛选器
+            historyCustomerFilter.innerHTML = '<option value="all">所有客户</option>';
+            db.customers.forEach(customer => {
+                const option = document.createElement('option');
+                option.value = customer.id;
+                option.textContent = customer.name;
+                historyCustomerFilter.appendChild(option);
+            });
+            
+            if (historySelectedValue) historyCustomerFilter.value = historySelectedValue;
+        }
+
+        // 显示客户详情
+        function showCustomerDetail(customerId) {
+            const customer = getCustomerById(customerId);
+            if (!customer) return;
+            
+            // 填充基本信息
+            const basicInfoContainer = document.getElementById('customer-basic-info');
+            basicInfoContainer.innerHTML = `
+                <div class="flex items-center">
+                    <div class="flex-shrink-0 h-12 w-12 flex items-center justify-center bg-gray-100 text-gray-500">
+                        <i class="fa fa-user text-xl"></i>
+                    </div>
+                    <div class="ml-4">
+                        <div class="text-lg font-medium text-gray-800">${customer.name}</div>
+                        <div class="text-sm text-gray-500">${customer.contact}</div>
+                    </div>
+                </div>
+                <div class="mt-4">
+                    <div class="text-sm text-gray-500">地址</div>
+                    <div class="text-sm text-gray-800">${customer.address || '-'}</div>
+                </div>
+                <div class="mt-2">
+                    <div class="text-sm text-gray-500">备注</div>
+                    <div class="text-sm text-gray-800">${customer.notes || '-'}</div>
+                </div>
+            `;
+            
+            // 填充财务概览
+            const financialInfoContainer = document.getElementById('customer-financial-info');
+            const totalDebt = calculateTotalDebt(customerId);
+            const totalPayment = calculateTotalPayment(customerId);
+            const remainingDebt = calculateRemainingDebt(customerId);
+            
+            financialInfoContainer.innerHTML = `
+                <div class="flex justify-between items-center p-3 bg-gray-50">
+                    <div class="text-sm text-gray-500">总欠款</div>
+                    <div class="text-lg font-medium text-gray-800">${formatCurrency(totalDebt)}</div>
+                </div>
+                <div class="flex justify-between items-center p-3 bg-gray-50">
+                    <div class="text-sm text-gray-500">已还款</div>
+                    <div class="text-lg font-medium text-success">${formatCurrency(totalPayment)}</div>
+                </div>
+                <div class="flex justify-between items-center p-3 bg-gray-50">
+                    <div class="text-sm text-gray-500">剩余欠款</div>
+                    <div class="text-lg font-medium ${remainingDebt > 0 ? 'text-danger' : 'text-success'}">${formatCurrency(remainingDebt)}</div>
+                </div>
+            `;
+            
+            // 填充欠款记录
+            const debtsListContainer = document.getElementById('customer-debts-list');
+            debtsListContainer.innerHTML = '';
+            
+            const debts = getDebtsByCustomerId(customerId);
+            if (debts.length === 0) {
+                debtsListContainer.innerHTML = `
+                    <tr>
+                        <td colspan="5" class="px-6 py-4 text-center text-gray-500">暂无欠款记录</td>
+                    </tr>
+                `;
+            } else {
+                debts.forEach(debt => {
+                    let statusBadge = '';
+                    if (debt.status === 'paid') {
+                        statusBadge = '<span class="badge badge-success">已还清</span>';
+                    } else if (debt.status === 'overdue') {
+                        statusBadge = '<span class="badge badge-danger">已逾期</span>';
+                    } else if (debt.status === 'partially') {
+                        statusBadge = '<span class="badge badge-warning">部分还款</span>';
+                    } else {
+                        statusBadge = '<span class="badge badge-warning">未还款</span>';
+                    }
+                    
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td class="table-cell">${formatCurrency(debt.amount)}</td>
+                        <td class="table-cell">${debt.date}</td>
+                        <td class="table-cell">${debt.dueDate || '-'}</td>
+                        <td class="table-cell">${debt.reason}</td>
+                        <td class="table-cell">${statusBadge}</td>
+                    `;
+                    debtsListContainer.appendChild(row);
+                });
+            }
+            
+            // 填充还款记录
+            const paymentsListContainer = document.getElementById('customer-payments-list');
+            paymentsListContainer.innerHTML = '';
+            
+            const payments = getPaymentsByCustomerId(customerId);
+            if (payments.length === 0) {
+                paymentsListContainer.innerHTML = `
+                    <tr>
+                        <td colspan="6" class="px-6 py-4 text-center text-gray-500">暂无还款记录</td>
+                    </tr>
+                `;
+            } else {
+                payments.forEach(payment => {
+                    let methodText = '';
+                    switch (payment.method) {
+                        case 'cash': methodText = '现金'; break;
+                        case 'bank': methodText = '银行转账'; break;
+                        case 'wechat': methodText = '微信支付'; break;
+                        case 'alipay': methodText = '支付宝'; break;
+                        default: methodText = '其他';
+                    }
+                    
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td class="table-cell">${formatCurrency(payment.amount)}</td>
+                        <td class="table-cell">${payment.date}</td>
+                        <td class="table-cell">${methodText}</td>
+                        <td class="table-cell">${payment.notes || '-'}</td>
+                        <td class="table-cell">
+                            <div class="flex space-x-2">
+                                <button class="print-receipt-btn text-primary hover:text-primary/80" data-id="${payment.id}">
+                                    <i class="fa fa-print"></i>
+                                </button>
+                                <button class="delete-payment-btn text-gray-400 hover:text-danger" data-id="${payment.id}">
+                                    <i class="fa fa-trash"></i>
+                                </button>
+                            </div>
+                        </td>
+                    `;
+                    paymentsListContainer.appendChild(row);
+                });
+                
+                // 添加事件监听
+                document.querySelectorAll('#customer-payments-list .delete-payment-btn').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        const paymentId = btn.getAttribute('data-id');
+                        if (confirm('确定要删除此还款记录吗？')) {
+                            deletePayment(paymentId);
+                            showCustomerDetail(customerId); // 刷新详情页
+                        }
+                    });
+                });
+                
+                document.querySelectorAll('#customer-payments-list .print-receipt-btn').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        const paymentId = btn.getAttribute('data-id');
+                        printReceipt(paymentId);
+                    });
+                });
+            }
+            
+            // 显示模态框
+            document.getElementById('customer-detail-modal').classList.remove('hidden');
+            
+            // 设置添加欠款和还款按钮的事件
+            document.getElementById('add-debt-from-detail').onclick = () => {
+                closeAllModals();
+                showAddDebtModal(customerId);
+            };
+            
+            document.getElementById('add-payment-from-detail').onclick = () => {
+                closeAllModals();
+                showAddPaymentModal(customerId);
+            };
+        }
+
+        // 显示添加欠款模态框
+        function showAddDebtModal(customerId = null) {
+            // 设置默认日期为今天
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('debt-date').value = today;
+            
+            // 如果指定了客户，选择该客户
+            if (customerId) {
+                document.getElementById('debt-customer').value = customerId;
+            }
+            
+            // 显示模态框
+            document.getElementById('add-debt-modal').classList.remove('hidden');
+        }
+
+        // 显示添加还款模态框
+        function showAddPaymentModal(customerId = null) {
+            // 设置默认日期为今天
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('payment-date').value = today;
+            
+            // 如果指定了客户，选择该客户
+            if (customerId) {
+                document.getElementById('payment-customer').value = customerId;
+            }
+            
+            // 显示模态框
+            document.getElementById('add-payment-modal').classList.remove('hidden');
+        }
+
+        // 关闭所有模态框
+        function closeAllModals() {
+            document.querySelectorAll('.fixed.inset-0.bg-white.bg-opacity-95').forEach(modal => {
+                modal.classList.add('hidden');
+            });
+        }
+
+        // 打印收据
+        function printReceipt(paymentId) {
+            const payment = db.payments.find(p => p.id === paymentId);
+            if (!payment) return;
+            
+            const customer = getCustomerById(payment.customerId);
+            if (!customer) return;
+            
+            // 创建收据HTML
+            const receiptHTML = `
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <meta charset="UTF-8">
+                    <title>还款收据</title>
+                    <style>
+                        body {
+                            font-family: 'Inter', system-ui, sans-serif;
+                            padding: 40px;
+                            max-width: 500px;
+                            margin: 0 auto;
+                        }
+                        .receipt-container {
+                            border: 1px solid #e2e8f0;
+                            padding: 30px;
+                        }
+                        .receipt-header {
+                            text-align: center;
+                            margin-bottom: 30px;
+                        }
+                        .receipt-title {
+                            font-size: 24px;
+                            font-weight: 600;
+                            margin-bottom: 5px;
+                        }
+                        .receipt-subtitle {
+                            color: #666;
+                            font-size: 14px;
+                        }
+                        .receipt-details {
+                            margin-bottom: 30px;
+                        }
+                        .detail-row {
+                            display: flex;
+                            margin-bottom: 10px;
+                        }
+                        .detail-label {
+                            width: 120px;
+                            font-weight: 500;
+                            color: #4a5568;
+                        }
+                        .detail-value {
+                            flex: 1;
+                        }
+                        .receipt-total {
+                            border-top: 1px solid #e2e8f0;
+                            padding-top: 15px;
+                            margin-top: 15px;
+                            font-size: 18px;
+                            font-weight: 600;
+                            text-align: right;
+                        }
+                        .receipt-footer {
+                            margin-top: 40px;
+                            text-align: center;
+                            font-size: 12px;
+                            color: #666;
+                        }
+                        .signature-line {
+                            margin-top: 50px;
+                            display: flex;
+                            justify-content: space-between;
+                        }
+                        .line {
+                            border-top: 1px solid #000;
+                            width: 150px;
+                            text-align: center;
+                            padding-top: 5px;
+                        }
+                        @media print {
+                            body {
+                                padding: 0;
+                            }
+                            .receipt-container {
+                                border: none;
+                            }
+                        }
+                    </style>
+                </head>
+                <body>
+                    <div class="receipt-container">
+                        <div class="receipt-header">
+                            <div class="receipt-title">还款收据</div>
+                            <div class="receipt-subtitle">客户欠款记账系统</div>
+                        </div>
+                        
+                        <div class="receipt-details">
+                            <div class="detail-row">
+                                <div class="detail-label">收据编号:</div>
+                                <div class="detail-value">REC-${payment.id.substring(0, 8).toUpperCase()}</div>
+                            </div>
+                            <div class="detail-row">
+                                <div class="detail-label">客户名称:</div>
+                                <div class="detail-value">${customer.name}</div>
+                            </div>
+                            <div class="detail-row">
+                                <div class="detail-label">联系方式:</div>
+                                <div class="detail-value">${customer.contact}</div>
+                            </div>
+                            <div class="detail-row">
+                                <div class="detail-label">还款日期:</div>
+                                <div class="detail-value">${payment.date}</div>
+                            </div>
+                            <div class="detail-row">
+                                <div class="detail-label">还款方式:</div>
+                                <div class="detail-value">${getPaymentMethodText(payment.method)}</div>
+                            </div>
+                            <div class="detail-row">
+                                <div class="detail-label">备注:</div>
+                                <div class="detail-value">${payment.notes || '-'}</div>
+                            </div>
+                            
+                            <div class="receipt-total">
+                                还款金额: ${formatCurrency(payment.amount)}
+                            </div>
+                        </div>
+                        
+                        <div class="signature-line">
+                            <div class="line">
+                                <div>客户签字</div>
+                            </div>
+                            <div class="line">
+                                <div>收款人签字</div>
+                            </div>
+                        </div>
+                        
+                        <div class="receipt-footer">
+                            <div>本收据一式两份，客户和收款方各执一份</div>
+                            <div>打印时间: ${new Date().toLocaleString()}</div>
+                        </div>
+                    </div>
+                </body>
+                </html>
+            `;
+            
+            // 创建新窗口打印收据
+            const printWindow = window.open('', '_blank');
+            printWindow.document.write(receiptHTML);
+            printWindow.document.close();
+            
+            // 等待窗口加载完成后打印
+            setTimeout(() => {
+                printWindow.print();
+                printWindow.close();
+            }, 500);
+        }
+        
+        // 获取还款方式文本
+        function getPaymentMethodText(method) {
+            switch (method) {
+                case 'cash': return '现金';
+                case 'bank': return '银行转账';
+                case 'wechat': return '微信支付';
+                case 'alipay': return '支付宝';
+                default: return '其他';
+            }
+        }
+
+        // 初始化事件监听
+        function initEventListeners() {
+            // 导航菜单切换
+            document.querySelectorAll('.sidebar-link, .mobile-nav-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const targetId = btn.id.replace('nav-', '').replace('-btn', '');
+                    const targetPage = document.getElementById(`${targetId}-page`);
+                    
+                    if (targetPage) {
+                        // 更新导航菜单激活状态
+                        document.querySelectorAll('.sidebar-link, .mobile-nav-btn').forEach(navBtn => {
+                            navBtn.classList.remove('active');
+                        });
+                        btn.classList.add('active');
+                        
+                        // 更新页面标题
+                        document.getElementById('page-title').textContent = btn.querySelector('span').textContent;
+                        
+                        // 显示目标页面，隐藏其他页面
+                        document.querySelectorAll('.page-content').forEach(page => {
+                            page.classList.add('hidden');
+                        });
+                        targetPage.classList.remove('hidden');
+                        
+                        // 关闭移动端菜单
+                        document.getElementById('mobile-menu').classList.add('hidden');
+                        document.getElementById('mobile-menu-content').classList.add('translate-x-full');
+                    }
+                });
+            });
+            
+            // 移动端菜单按钮
+            document.getElementById('mobile-menu-btn').addEventListener('click', () => {
+                document.getElementById('mobile-menu').classList.remove('hidden');
+                setTimeout(() => {
+                    document.getElementById('mobile-menu-content').classList.remove('translate-x-full');
+                }, 10);
+            });
+            
+            // 关闭移动端菜单
+            document.getElementById('close-mobile-menu').addEventListener('click', () => {
+                document.getElementById('mobile-menu-content').classList.add('translate-x-full');
+                setTimeout(() => {
+                    document.getElementById('mobile-menu').classList.add('hidden');
+                }, 300);
+            });
+            
+            // 点击模态框背景关闭模态框
+            document.querySelectorAll('.fixed.inset-0.bg-white.bg-opacity-95').forEach(modal => {
+                modal.addEventListener('click', (e) => {
+                    if (e.target === modal) {
+                        closeAllModals();
+                    }
+                });
+            });
+            
+            // 关闭模态框按钮
+            document.querySelectorAll('.close-modal').forEach(btn => {
+                btn.addEventListener('click', closeAllModals);
+            });
+            
+            // 添加客户按钮
+            document.getElementById('add-customer-btn').addEventListener('click', () => {
+                document.getElementById('add-customer-form').reset();
+                document.getElementById('add-customer-modal').classList.remove('hidden');
+            });
+            
+            // 添加欠款按钮
+            document.getElementById('add-debt-btn').addEventListener('click', () => {
+                document.getElementById('add-debt-form').reset();
+                document.getElementById('add-debt-modal').classList.remove('hidden');
+            });
+            
+            // 添加还款按钮
+            document.getElementById('add-payment-btn').addEventListener('click', () => {
+                document.getElementById('add-payment-form').reset();
+                document.getElementById('add-payment-modal').classList.remove('hidden');
+            });
+            
+            // 查看全部历史记录
+            document.getElementById('view-all-history').addEventListener('click', (e) => {
+                e.preventDefault();
+                
+                // 切换到历史记录页面
+                document.querySelectorAll('.sidebar-link, .mobile-nav-btn').forEach(navBtn => {
+                    navBtn.classList.remove('active');
+                });
+                
+                const historyBtn = document.getElementById('nav-history');
+                if (historyBtn) historyBtn.classList.add('active');
+                
+                // 更新页面标题
+                document.getElementById('page-title').textContent = '历史记录';
+                
+                // 显示历史记录页面，隐藏其他页面
+                document.querySelectorAll('.page-content').forEach(page => {
+                    page.classList.add('hidden');
+                });
+                document.getElementById('history-page').classList.remove('hidden');
+            });
+            
+            // 添加客户表单提交
+            document.getElementById('add-customer-form').addEventListener('submit', (e) => {
+                e.preventDefault();
+                
+                const formData = new FormData(e.target);
+                const customer = {
+                    name: formData.get('name'),
+                    contact: formData.get('contact'),
+                    address: formData.get('address'),
+                    notes: formData.get('notes')
+                };
+                
+                addCustomer(customer);
+                
+                // 重置表单
+                e.target.reset();
+                
+                // 关闭模态框
+                closeAllModals();
+                
+                // 更新UI
+                renderCustomers();
+                updateCustomerOptions();
+                updateDashboard();
+            });
+            
+            // 添加欠款表单提交
+            document.getElementById('add-debt-form').addEventListener('submit', (e) => {
+                e.preventDefault();
+                
+                const formData = new FormData(e.target);
+                const debt = {
+                    customerId: formData.get('customerId'),
+                    amount: formData.get('amount'),
+                    date: formData.get('date'),
+                    dueDate: formData.get('dueDate'),
+                    reason: formData.get('reason'),
+                    notes: formData.get('notes')
+                };
+                
+                addDebt(debt);
+                
+                // 重置表单
+                e.target.reset();
+                
+                // 关闭模态框
+                closeAllModals();
+                
+                // 更新UI
+                renderDebts();
+                renderCustomers();
+                renderHistory();
+                updateDashboard();
+            });
+            
+            // 添加还款表单提交
+            document.getElementById('add-payment-form').addEventListener('submit', (e) => {
+                e.preventDefault();
+                
+                const formData = new FormData(e.target);
+                const payment = {
+                    customerId: formData.get('customerId'),
+                    amount: formData.get('amount'),
+                    date: formData.get('date'),
+                    method: formData.get('method'),
+                    notes: formData.get('notes')
+                };
+                
+                addPayment(payment);
+                
+                // 重置表单
+                e.target.reset();
+                
+                // 关闭模态框
+                closeAllModals();
+                
+                // 更新UI
+                renderPayments();
+                renderDebts();
+                renderCustomers();
+                renderHistory();
+                updateDashboard();
+            });
+            
+            // 历史记录筛选事件
+            document.getElementById('history-filter').addEventListener('change', () => {
+                const filter = document.getElementById('history-filter').value;
+                const customerFilter = document.getElementById('history-customer-filter').value;
+                renderHistory(filter, customerFilter);
+            });
+            
+            // 历史记录客户筛选事件
+            document.getElementById('history-customer-filter').addEventListener('change', () => {
+                const filter = document.getElementById('history-filter').value;
+                const customerFilter = document.getElementById('history-customer-filter').value;
+                renderHistory(filter, customerFilter);
+            });
+            
+            // 搜索框事件
+            document.getElementById('search-input').addEventListener('input', (e) => {
+                const searchTerm = e.target.value.toLowerCase();
+                
+                if (searchTerm.length < 2) {
+                    // 搜索词太短，不执行搜索
+                    renderCustomers();
+                    renderDebts();
+                    renderPayments();
+                    renderHistory();
+                    return;
+                }
+                
+                // 搜索客户
+                const filteredCustomers = db.customers.filter(customer => 
+                    customer.name.toLowerCase().includes(searchTerm) || 
+                    customer.contact.toLowerCase().includes(searchTerm)
+                );
+                
+                const filteredCustomerIds = filteredCustomers.map(customer => customer.id);
+                
+                // 更新客户列表
+                const customersList = document.getElementById('customers-list');
+                customersList.innerHTML = '';
+                
+                if (filteredCustomers.length === 0) {
+                    customersList.innerHTML = `
+                        <tr>
+                            <td colspan="5" class="px-6 py-4 text-center text-gray-500">没有找到匹配的客户</td>
+                        </tr>
+                    `;
+                } else {
+                    filteredCustomers.forEach(customer => {
+                        const totalDebt = calculateTotalDebt(customer.id);
+                        const remainingDebt = calculateRemainingDebt(customer.id);
+                        const debts = getDebtsByCustomerId(customer.id);
+                        
+                        // 创建客户行
+                        const customerRow = document.createElement('tr');
+                        customerRow.innerHTML = `
+                            <td class="table-cell" colspan="5">
+                                <div class="flex items-center justify-between p-4 bg-gray-50">
+                                    <div class="flex items-center">
+                                        <div class="flex-shrink-0 h-10 w-10 flex items-center justify-center bg-gray-200 text-gray-600">
+                                            <i class="fa fa-user"></i>
+                                        </div>
+                                        <div class="ml-4">
+                                            <div class="text-sm font-medium text-gray-800">${customer.name}</div>
+                                            <div class="text-xs text-gray-500">${customer.contact} | ${customer.address || '-'}</div>
+                                        </div>
+                                    </div>
+                                    <div class="text-right">
+                                        <div class="text-sm text-gray-500">总欠款: <span class="font-medium">${formatCurrency(totalDebt)}</span></div>
+                                        <div class="text-sm ${remainingDebt > 0 ? 'text-danger' : 'text-success'}">剩余欠款: <span class="font-medium">${formatCurrency(remainingDebt)}</span></div>
+                                    </div>
+                                </div>
+                            </td>
+                        `;
+                        customersList.appendChild(customerRow);
+                        
+                        // 如果有欠款记录，添加欠款明细行
+                        if (debts.length > 0) {
+                            // 添加欠款明细标题行
+                            const headerRow = document.createElement('tr');
+                            headerRow.innerHTML = `
+                                <td class="table-cell pl-16 font-medium text-gray-700">欠款明细</td>
+                                <td class="table-cell font-medium text-gray-700">金额</td>
+                                <td class="table-cell font-medium text-gray-700">日期</td>
+                                <td class="table-cell font-medium text-gray-700">预计还款日期</td>
+                                <td class="table-cell font-medium text-gray-700">状态</td>
+                            `;
+                            customersList.appendChild(headerRow);
+                            
+                            // 添加每条欠款记录
+                            debts.forEach(debt => {
+                                let statusBadge = '';
+                                if (debt.status === 'paid') {
+                                    statusBadge = '<span class="badge badge-success">已还清</span>';
+                                } else if (debt.status === 'overdue') {
+                                    statusBadge = '<span class="badge badge-danger">已逾期</span>';
+                                } else if (debt.status === 'partially') {
+                                    statusBadge = '<span class="badge badge-warning">部分还款</span>';
+                                } else {
+                                    statusBadge = '<span class="badge badge-warning">未还款</span>';
+                                }
+                                
+                                const debtRow = document.createElement('tr');
+                                debtRow.innerHTML = `
+                                    <td class="table-cell pl-16">${debt.reason}</td>
+                                    <td class="table-cell">${formatCurrency(debt.amount)}</td>
+                                    <td class="table-cell">${debt.date}</td>
+                                    <td class="table-cell">${debt.dueDate || '-'}</td>
+                                    <td class="table-cell">${statusBadge}</td>
+                                `;
+                                customersList.appendChild(debtRow);
+                            });
+                            
+                            // 添加操作行
+                            const actionRow = document.createElement('tr');
+                            actionRow.innerHTML = `
+                                <td class="table-cell pl-16 pt-4" colspan="5">
+                                    <div class="flex space-x-3">
+                                        <button class="view-customer-btn btn-primary py-1 px-3 text-sm flex items-center" data-id="${customer.id}">
+                                            <i class="fa fa-eye mr-1"></i> 查看详情
+                                        </button>
+                                        <button class="add-payment-for-customer btn-secondary py-1 px-3 text-sm flex items-center" data-id="${customer.id}">
+                                            <i class="fa fa-plus mr-1"></i> 记录还款
+                                        </button>
+                                    </div>
+                                </td>
+                            `;
+                            customersList.appendChild(actionRow);
+                        } else {
+                            // 如果没有欠款记录，显示提示
+                            const noDebtRow = document.createElement('tr');
+                            noDebtRow.innerHTML = `
+                                <td class="table-cell pl-16 py-4 text-gray-500" colspan="5">
+                                    该客户暂无欠款记录
+                                    <div class="flex space-x-3 mt-2">
+                                        <button class="view-customer-btn btn-primary py-1 px-3 text-sm flex items-center" data-id="${customer.id}">
+                                            <i class="fa fa-eye mr-1"></i> 查看详情
+                                        </button>
+                                        <button class="add-debt-for-customer btn-secondary py-1 px-3 text-sm flex items-center" data-id="${customer.id}">
+                                            <i class="fa fa-plus mr-1"></i> 添加欠款
+                                        </button>
+                                    </div>
+                                </td>
+                            `;
+                            customersList.appendChild(noDebtRow);
+                        }
+                        
+                        // 添加分隔行
+                        const separatorRow = document.createElement('tr');
+                        separatorRow.innerHTML = `
+                            <td colspan="5" class="py-2"></td>
+                        `;
+                        customersList.appendChild(separatorRow);
+                    });
+                    
+                    // 添加事件监听
+                    document.querySelectorAll('.view-customer-btn').forEach(btn => {
+                        btn.addEventListener('click', () => {
+                            const customerId = btn.getAttribute('data-id');
+                            showCustomerDetail(customerId);
+                        });
+                    });
+                    
+                    document.querySelectorAll('.add-payment-for-customer').forEach(btn => {
+                        btn.addEventListener('click', () => {
+                            const customerId = btn.getAttribute('data-id');
+                            showAddPaymentModal(customerId);
+                        });
+                    });
+                    
+                    document.querySelectorAll('.add-debt-for-customer').forEach(btn => {
+                        btn.addEventListener('click', () => {
+                            const customerId = btn.getAttribute('data-id');
+                            showAddDebtModal(customerId);
+                        });
+                    });
+                }
+                
+                // 更新欠款列表
+                const debtsList = document.getElementById('debts-list');
+                debtsList.innerHTML = '';
+                
+                const filteredDebts = db.debts.filter(debt => 
+                    filteredCustomerIds.includes(debt.customerId) ||
+                    debt.reason.toLowerCase().includes(searchTerm)
+                );
+                
+                if (filteredDebts.length === 0) {
+                    debtsList.innerHTML = `
+                        <tr>
+                            <td colspan="7" class="px-6 py-4 text-center text-gray-500">没有找到匹配的欠款记录</td>
+                        </tr>
+                    `;
+                } else {
+                    filteredDebts.forEach(debt => {
+                        const customer = getCustomerById(debt.customerId);
+
+                        let statusBadge = '';
+                        if (debt.status === 'paid') {
+                            statusBadge = '<span class="badge badge-success">已还清</span>';
+                        } else if (debt.status === 'overdue') {
+                            statusBadge = '<span class="badge badge-danger">已逾期</span>';
+                        } else if (debt.status === 'partially') {
+                            statusBadge = '<span class="badge badge-warning">部分还款</span>';
+                        } else {
+                            statusBadge = '<span class="badge badge-warning">未还款</span>';
+                        }
+
+                        const row = document.createElement('tr');
+                        row.innerHTML = `
+                            <td class="table-cell">${customer ? customer.name : '未知客户'}</td>
+                            <td class="table-cell">${formatCurrency(debt.amount)}</td>
+                            <td class="table-cell">${debt.date}</td>
+                            <td class="table-cell">${debt.dueDate || '-'}</td>
+                            <td class="table-cell">${debt.reason}</td>
+                            <td class="table-cell">${statusBadge}</td>
+                            <td class="table-cell">
+                                <div class="flex space-x-2">
+                                    <button class="delete-debt-btn text-gray-400 hover:text-danger" data-id="${debt.id}">
+                                        <i class="fa fa-trash"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        `;
+                        debtsList.appendChild(row);
+                    });
+
+                    // 添加事件监听
+                    document.querySelectorAll('.delete-debt-btn').forEach(btn => {
+                        btn.addEventListener('click', () => {
+                            const debtId = btn.getAttribute('data-id');
+                            if (confirm('确定要删除此欠款记录吗？')) {
+                                deleteDebt(debtId);
+                            }
+                        });
+                    });
+                }
+                
+                // 更新还款列表
+                const paymentsList = document.getElementById('payments-list');
+                paymentsList.innerHTML = '';
+                
+                const filteredPayments = db.payments.filter(payment => 
+                    filteredCustomerIds.includes(payment.customerId) ||
+                    (payment.notes && payment.notes.toLowerCase().includes(searchTerm))
+                );
+                
+                if (filteredPayments.length === 0) {
+                    paymentsList.innerHTML = `
+                        <tr>
+                            <td colspan="7" class="px-6 py-4 text-center text-gray-500">没有找到匹配的还款记录</td>
+                        </tr>
+                    `;
+                } else {
+                    filteredPayments.forEach(payment => {
+                        const customer = getCustomerById(payment.customerId);
+                        
+                        let methodText = '';
+                        switch (payment.method) {
+                            case 'cash': methodText = '现金'; break;
+                            case 'bank': methodText = '银行转账'; break;
+                            case 'wechat': methodText = '微信支付'; break;
+                            case 'alipay': methodText = '支付宝'; break;
+                            default: methodText = '其他';
+                        }
+
+                        const row = document.createElement('tr');
+                        row.innerHTML = `
+                            <td class="table-cell">${customer ? customer.name : '未知客户'}</td>
+                            <td class="table-cell">${formatCurrency(payment.amount)}</td>
+                            <td class="table-cell">${payment.date}</td>
+                            <td class="table-cell">${methodText}</td>
+                            <td class="table-cell">${payment.notes || '-'}</td>
+                            <td class="table-cell">
+                                <div class="flex space-x-2">
+                                    <button class="print-receipt-btn text-primary hover:text-primary/80" data-id="${payment.id}">
+                                        <i class="fa fa-print"></i>
+                                    </button>
+                                    <button class="delete-payment-btn text-gray-400 hover:text-danger" data-id="${payment.id}">
+                                        <i class="fa fa-trash"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        `;
+                        paymentsList.appendChild(row);
+                    });
+
+                    // 添加事件监听
+                    document.querySelectorAll('.delete-payment-btn').forEach(btn => {
+                        btn.addEventListener('click', () => {
+                            const paymentId = btn.getAttribute('data-id');
+                            if (confirm('确定要删除此还款记录吗？')) {
+                                deletePayment(paymentId);
+                            }
+                        });
+                    });
+                    
+                    document.querySelectorAll('.print-receipt-btn').forEach(btn => {
+                        btn.addEventListener('click', () => {
+                            const paymentId = btn.getAttribute('data-id');
+                            printReceipt(paymentId);
+                        });
+                    });
+                }
+                
+                // 更新历史记录
+                renderHistory('all', filteredCustomerIds.length > 0 ? filteredCustomerIds[0] : 'all');
+                
+                // 显示搜索结果提示
+                if (filteredCustomers.length > 0) {
+                    const searchResultCount = document.getElementById('search-result-count');
+                    if (searchResultCount) {
+                        searchResultCount.textContent = `找到 ${filteredCustomers.length} 个匹配的客户`;
+                    } else {
+                        const resultCountElement = document.createElement('div');
+                        resultCountElement.id = 'search-result-count';
+                        resultCountElement.className = 'mt-4 text-sm text-gray-500';
+                        resultCountElement.textContent = `找到 ${filteredCustomers.length} 个匹配的客户`;
+                        
+                        const searchContainer = document.querySelector('.flex.flex-col.md\\:flex-row.md\\:items-center.md\\:justify-between.mb-8');
+                        searchContainer.appendChild(resultCountElement);
+                    }
+                } else {
+                    const searchResultCount = document.getElementById('search-result-count');
+                    if (searchResultCount) {
+                        searchResultCount.remove();
+                    }
+                }
+            });
+        }
+
+        // 初始化自定义鼠标
+        function initCustomCursor() {
+            const cursor = document.getElementById('custom-cursor');
+            let mouseX = 0;
+            let mouseY = 0;
+            let cursorX = 0;
+            let cursorY = 0;
+
+            // 初始显示光标
+            document.addEventListener('mousemove', (e) => {
+                cursor.style.opacity = '1';
+                mouseX = e.clientX;
+                mouseY = e.clientY;
+            });
+
+            // 平滑跟随效果
+            function animateCursor() {
+                const speed = 0.2; // 跟随速度
+                cursorX += (mouseX - cursorX) * speed;
+                cursorY += (mouseY - cursorY) * speed;
+            
+                cursor.style.transform = `translate(${cursorX}px, ${cursorY}px)`;
+                requestAnimationFrame(animateCursor);
+            }
+
+            animateCursor();
+
+            // 悬停效果示例
+            const hoverElements = document.querySelectorAll('button, a, input, select, textarea');
+            hoverElements.forEach(element => {
+                element.addEventListener('mouseenter', () => {
+                    cursor.classList.add('scale-150');
+                    cursor.style.borderColor = '#2D3748';
+                });
+            
+                element.addEventListener('mouseleave', () => {
+                    cursor.classList.remove('scale-150');
+                    cursor.style.borderColor = '#CBD5E0';
+                });
+            });
+        }
+
+        // 初始化应用
+        function initApp() {
+            initData();
+            initEventListeners();
+            initCustomCursor();
+            renderCustomers();
+            renderDebts();
+            renderPayments();
+            renderHistory();
+            updateDashboard();
+            updateCustomerOptions();
+        }
+
+        // 启动应用
+        document.addEventListener('DOMContentLoaded', initApp);
+        
+        // 初始化Firebase认证和数据同步
+        document.addEventListener('DOMContentLoaded', () => {
+            // 初始化数据同步
+            DataSync.initialize();
+            
+            // 绑定认证相关事件
+            bindAuthEvents();
+        });
+        
+        // 绑定认证相关事件
+        function bindAuthEvents() {
+            // 显示登录/注册模态框
+            document.getElementById('show-login-btn').addEventListener('click', () => {
+                document.getElementById('auth-modal').classList.remove('hidden');
+                document.getElementById('login-form').classList.remove('hidden');
+                document.getElementById('register-form').classList.add('hidden');
+                document.getElementById('auth-modal-title').textContent = '登录';
+            });
+            
+            // 关闭认证模态框
+            document.getElementById('close-auth-modal').addEventListener('click', () => {
+                document.getElementById('auth-modal').classList.add('hidden');
+                document.getElementById('auth-error').classList.add('hidden');
+            });
+            
+            // 切换到注册表单
+            document.getElementById('show-register-form').addEventListener('click', () => {
+                document.getElementById('login-form').classList.add('hidden');
+                document.getElementById('register-form').classList.remove('hidden');
+                document.getElementById('auth-modal-title').textContent = '注册';
+                document.getElementById('auth-error').classList.add('hidden');
+            });
+            
+            // 切换到登录表单
+            document.getElementById('show-login-form').addEventListener('click', () => {
+                document.getElementById('register-form').classList.add('hidden');
+                document.getElementById('login-form').classList.remove('hidden');
+                document.getElementById('auth-modal-title').textContent = '登录';
+                document.getElementById('auth-error').classList.add('hidden');
+            });
+            
+            // 提交登录
+            document.getElementById('submit-login').addEventListener('click', async () => {
+                const email = document.getElementById('login-email').value;
+                const password = document.getElementById('login-password').value;
+                
+                if (!email || !password) {
+                    showAuthError('请填写所有必填字段');
+                    return;
+                }
+                
+                const result = await Auth.login(email, password);
+                if (result.success) {
+                    document.getElementById('auth-modal').classList.add('hidden');
+                    updateUserProfile(result.user);
+                } else {
+                    showAuthError(result.error);
+                }
+            });
+            
+            // 提交注册
+            document.getElementById('submit-register').addEventListener('click', async () => {
+                const name = document.getElementById('register-name').value;
+                const email = document.getElementById('register-email').value;
+                const password = document.getElementById('register-password').value;
+                
+                if (!name || !email || !password) {
+                    showAuthError('请填写所有必填字段');
+                    return;
+                }
+                
+                if (password.length < 6) {
+                    showAuthError('密码至少需要6位');
+                    return;
+                }
+                
+                const result = await Auth.register(email, password, name);
+                if (result.success) {
+                    document.getElementById('auth-modal').classList.add('hidden');
+                    updateUserProfile(result.user);
+                } else {
+                    showAuthError(result.error);
+                }
+            });
+            
+            // 显示管理员面板
+            document.getElementById('show-admin-panel').addEventListener('click', () => {
+                document.getElementById('admin-modal').classList.remove('hidden');
+                loadUsersList();
+            });
+            
+            // 关闭管理员面板
+            document.getElementById('close-admin-modal').addEventListener('click', () => {
+                document.getElementById('admin-modal').classList.add('hidden');
+            });
+            
+            document.getElementById('close-admin-panel-btn').addEventListener('click', () => {
+                document.getElementById('admin-modal').classList.add('hidden');
+            });
+            
+            // 添加用户
+            document.getElementById('add-user-btn').addEventListener('click', () => {
+                document.getElementById('add-user-modal').classList.remove('hidden');
+            });
+            
+            // 取消添加用户
+            document.getElementById('cancel-add-user').addEventListener('click', () => {
+                document.getElementById('add-user-modal').classList.add('hidden');
+                document.getElementById('add-user-error').classList.add('hidden');
+            });
+            
+            // 提交添加用户
+            document.getElementById('submit-add-user').addEventListener('click', async () => {
+                const name = document.getElementById('new-user-name').value;
+                const email = document.getElementById('new-user-email').value;
+                const password = document.getElementById('new-user-password').value;
+                const role = document.getElementById('new-user-role').value;
+                
+                if (!name || !email || !password) {
+                    document.getElementById('add-user-error').textContent = '请填写所有必填字段';
+                    document.getElementById('add-user-error').classList.remove('hidden');
+                    return;
+                }
+                
+                if (password.length < 6) {
+                    document.getElementById('add-user-error').textContent = '密码至少需要6位';
+                    document.getElementById('add-user-error').classList.remove('hidden');
+                    return;
+                }
+                
+                const result = await Auth.register(email, password, name);
+                if (result.success) {
+                    // 更新用户角色
+                    if (role !== 'user') {
+                        await Auth.updateUserRole(result.user.uid, role);
+                    }
+                    
+                    document.getElementById('add-user-modal').classList.add('hidden');
+                    loadUsersList();
+                } else {
+                    document.getElementById('add-user-error').textContent = result.error;
+                    document.getElementById('add-user-error').classList.remove('hidden');
+                }
+            });
+        }
+        
+        // 显示认证错误
+        function showAuthError(message) {
+            const errorElement = document.getElementById('auth-error');
+            errorElement.textContent = message;
+            errorElement.classList.remove('hidden');
+        }
+        
+        // 更新用户资料显示
+        function updateUserProfile(user) {
+            if (user) {
+                document.getElementById('user-profile').classList.remove('hidden');
+                document.getElementById('login-prompt').classList.add('hidden');
+                document.getElementById('user-name').textContent = user.displayName || '用户';
+                document.getElementById('user-email').textContent = user.email;
+                
+                // 检查用户角色
+                checkUserRole(user.uid);
+            } else {
+                document.getElementById('user-profile').classList.add('hidden');
+                document.getElementById('login-prompt').classList.remove('hidden');
+                document.getElementById('admin-panel').classList.add('hidden');
+            }
+        }
+        
+        // 检查用户角色
+        async function checkUserRole(userId) {
+            const role = await Auth.getUserRole(userId);
+            if (role === 'admin') {
+                document.getElementById('admin-panel').classList.remove('hidden');
+            } else {
+                document.getElementById('admin-panel').classList.add('hidden');
+            }
+        }
+        
+        // 加载用户列表（管理员功能）
+        async function loadUsersList() {
+            try {
+                const usersRef = database.ref('users');
+                const snapshot = await usersRef.once('value');
+                const users = snapshot.val() || {};
+                
+                const usersList = document.getElementById('users-list');
+                usersList.innerHTML = '';
+                
+                Object.keys(users).forEach(userId => {
+                    const user = users[userId];
+                    const row = document.createElement('tr');
+                    
+                    row.innerHTML = `
+                        <td class="table-cell">${user.displayName || '未知'}</td>
+                        <td class="table-cell">${user.email}</td>
+                        <td class="table-cell">
+                            <span class="badge ${user.role === 'admin' ? 'badge-warning' : 'badge-success'}">
+                                ${user.role === 'admin' ? '管理员' : '普通用户'}
+                            </span>
+                        </td>
+                        <td class="table-cell">${new Date(user.createdAt).toLocaleDateString()}</td>
+                        <td class="table-cell">
+                            <select class="input-field text-sm py-1 px-2 user-role-select" data-user-id="${userId}">
+                                <option value="user" ${user.role === 'user' ? 'selected' : ''}>普通用户</option>
+                                <option value="admin" ${user.role === 'admin' ? 'selected' : ''}>管理员</option>
+                            </select>
+                        </td>
+                    `;
+                    
+                    usersList.appendChild(row);
+                });
+                
+                // 绑定角色变更事件
+                document.querySelectorAll('.user-role-select').forEach(select => {
+                    select.addEventListener('change', async (e) => {
+                        const userId = e.target.dataset.userId;
+                        const newRole = e.target.value;
+                        await Auth.updateUserRole(userId, newRole);
+                    });
+                });
+            } catch (error) {
+                console.error("加载用户列表失败:", error);
+            }
+        }
+        
+        // 修改原有数据操作函数，使用DataSync替代本地存储
+        // 修改添加客户函数
+        const originalAddCustomer = addCustomer;
+        window.addCustomer = async (customerData) => {
+            const result = await DataSync.addCustomer(customerData);
+            if (result.success) {
+                // 数据已通过Firebase同步，无需手动更新
+                return result.customerId;
+            } else {
+                console.error("添加客户失败:", result.error);
+                return null;
+            }
+        };
+        
+        // 修改添加欠款函数
+        const originalAddDebt = addDebt;
+        window.addDebt = async (debtData) => {
+            const result = await DataSync.addDebt(debtData);
+            if (result.success) {
+                // 数据已通过Firebase同步，无需手动更新
+                return result.debtId;
+            } else {
+                console.error("添加欠款记录失败:", result.error);
+                return null;
+            }
+        };
+        
+        // 修改添加还款函数
+        const originalAddPayment = addPayment;
+        window.addPayment = async (paymentData) => {
+            const result = await DataSync.addPayment(paymentData);
+            if (result.success) {
+                // 数据已通过Firebase同步，无需手动更新
+                return result.paymentId;
+            } else {
+                console.error("添加还款记录失败:", result.error);
+                return null;
+            }
+        };
+        
+        // 修改删除客户函数
+        const originalDeleteCustomer = deleteCustomer;
+        window.deleteCustomer = async (customerId) => {
+            const result = await DataSync.deleteCustomer(customerId);
+            if (result.success) {
+                // 数据已通过Firebase同步，无需手动更新
+                return true;
+            } else {
+                console.error("删除客户失败:", result.error);
+                alert(result.error);
+                return false;
+            }
+        };
+        
+        // 修改删除欠款函数
+        const originalDeleteDebt = deleteDebt;
+        window.deleteDebt = async (debtId) => {
+            const result = await DataSync.deleteDebt(debtId);
+            if (result.success) {
+                // 数据已通过Firebase同步，无需手动更新
+                return true;
+            } else {
+                console.error("删除欠款记录失败:", result.error);
+                alert(result.error);
+                return false;
+            }
+        };
+        
+        // 修改删除还款函数
+        const originalDeletePayment = deletePayment;
+        window.deletePayment = async (paymentId) => {
+            const result = await DataSync.deletePayment(paymentId);
+            if (result.success) {
+                // 数据已通过Firebase同步，无需手动更新
+                return true;
+            } else {
+                console.error("删除还款记录失败:", result.error);
+                alert(result.error);
+                return false;
+            }
+        };
+    </script>
+    
+    <!-- 登录/注册模态框 -->
+    <div id="auth-modal" class="fixed inset-0 bg-white bg-opacity-95 z-50 flex items-center justify-center hidden">
+        <div class="bg-white border border-gray-200 shadow-sm w-full max-w-md mx-4 animate-slide-in transform transition-all duration-300">
+            <div class="p-6 border-b border-gray-100">
+                <div class="flex items-center justify-between">
+                    <h3 id="auth-modal-title" class="text-lg font-light text-gray-800">登录</h3>
+                    <button id="close-auth-modal" class="text-gray-500 hover:text-gray-700">
+                        <i class="fa fa-times"></i>
+                    </button>
+                </div>
+                <div class="line-element w-1/4 mt-4"></div>
+            </div>
+            
+            <div class="p-6">
+                <div id="login-form">
+                    <div class="form-group">
+                        <label for="login-email" class="form-label">邮箱</label>
+                        <input type="email" id="login-email" class="input-field" placeholder="请输入邮箱地址">
+                    </div>
+                    <div class="form-group">
+                        <label for="login-password" class="form-label">密码</label>
+                        <input type="password" id="login-password" class="input-field" placeholder="请输入密码">
+                    </div>
+                    <div class="flex items-center justify-between mt-6">
+                        <button id="submit-login" class="btn-primary">登录</button>
+                        <button id="show-register-form" class="text-primary hover:text-primary/80 text-sm font-medium">注册新账号</button>
+                    </div>
+                </div>
+                
+                <div id="register-form" class="hidden">
+                    <div class="form-group">
+                        <label for="register-name" class="form-label">姓名</label>
+                        <input type="text" id="register-name" class="input-field" placeholder="请输入您的姓名">
+                    </div>
+                    <div class="form-group">
+                        <label for="register-email" class="form-label">邮箱</label>
+                        <input type="email" id="register-email" class="input-field" placeholder="请输入邮箱地址">
+                    </div>
+                    <div class="form-group">
+                        <label for="register-password" class="form-label">密码</label>
+                        <input type="password" id="register-password" class="input-field" placeholder="请输入密码（至少6位）">
+                    </div>
+                    <div class="flex items-center justify-between mt-6">
+                        <button id="submit-register" class="btn-primary">注册</button>
+                        <button id="show-login-form" class="text-primary hover:text-primary/80 text-sm font-medium">已有账号？登录</button>
+                    </div>
+                </div>
+                
+                <div id="auth-error" class="mt-4 p-3 bg-red-50 text-red-800 text-sm hidden"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 管理员功能区 -->
+    <div id="admin-panel" class="fixed bottom-6 left-6 z-50 hidden">
+        <button id="show-admin-panel" class="bg-primary text-white p-3 shadow-sm hover:shadow-md transition-all duration-300">
+            <i class="fa fa-cog"></i>
+        </button>
+    </div>
+
+    <!-- 管理员面板模态框 -->
+    <div id="admin-modal" class="fixed inset-0 bg-white bg-opacity-95 z-50 flex items-center justify-center hidden">
+        <div class="bg-white border border-gray-200 shadow-sm w-full max-w-2xl mx-4 animate-slide-in transform transition-all duration-300">
+            <div class="p-6 border-b border-gray-100">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-lg font-light text-gray-800">管理员面板</h3>
+                    <button id="close-admin-modal" class="text-gray-500 hover:text-gray-700">
+                        <i class="fa fa-times"></i>
+                    </button>
+                </div>
+                <div class="line-element w-1/4 mt-4"></div>
+            </div>
+            
+            <div class="p-6">
+                <div class="mb-6">
+                    <h4 class="text-md font-medium text-gray-800 mb-4">用户管理</h4>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full">
+                            <thead>
+                                <tr>
+                                    <th scope="col" class="table-header">用户姓名</th>
+                                    <th scope="col" class="table-header">邮箱</th>
+                                    <th scope="col" class="table-header">角色</th>
+                                    <th scope="col" class="table-header">创建时间</th>
+                                    <th scope="col" class="table-header">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="users-list" class="divide-y divide-gray-100">
+                                <!-- 用户列表将通过JavaScript动态生成 -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <div class="flex justify-end">
+                    <button id="add-user-btn" class="btn-primary mr-4">添加用户</button>
+                    <button id="close-admin-panel-btn" class="btn-secondary">关闭</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 添加用户模态框 -->
+    <div id="add-user-modal" class="fixed inset-0 bg-white bg-opacity-95 z-50 flex items-center justify-center hidden">
+        <div class="bg-white border border-gray-200 shadow-sm w-full max-w-md mx-4 animate-slide-in transform transition-all duration-300">
+            <div class="p-6 border-b border-gray-100">
+                <h3 class="text-lg font-light text-gray-800">添加用户</h3>
+                <div class="line-element w-1/4 mt-4"></div>
+            </div>
+            
+            <div class="p-6">
+                <div class="form-group">
+                    <label for="new-user-name" class="form-label">姓名</label>
+                    <input type="text" id="new-user-name" class="input-field" placeholder="请输入用户姓名">
+                </div>
+                <div class="form-group">
+                    <label for="new-user-email" class="form-label">邮箱</label>
+                    <input type="email" id="new-user-email" class="input-field" placeholder="请输入邮箱地址">
+                </div>
+                <div class="form-group">
+                    <label for="new-user-password" class="form-label">密码</label>
+                    <input type="password" id="new-user-password" class="input-field" placeholder="请输入密码（至少6位）">
+                </div>
+                <div class="form-group">
+                    <label for="new-user-role" class="form-label">角色</label>
+                    <select id="new-user-role" class="input-field">
+                        <option value="user">普通用户</option>
+                        <option value="admin">管理员</option>
+                    </select>
+                </div>
+                
+                <div class="flex justify-end mt-6">
+                    <button id="cancel-add-user" class="btn-secondary mr-4">取消</button>
+                    <button id="submit-add-user" class="btn-primary">添加</button>
+                </div>
+                
+                <div id="add-user-error" class="mt-4 p-3 bg-red-50 text-red-800 text-sm hidden"></div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
