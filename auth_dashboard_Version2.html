@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>用户主页</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; max-width: 720px; margin:auto; }
+    button { padding:8px 12px; }
+  </style>
+</head>
+<body>
+  <h1>用户主页（示例）</h1>
+  <div id="info">正在检查登录状态……</div>
+  <div id="meta" style="margin-top:12px"></div>
+  <button id="btn-logout" style="display:none; margin-top:12px">登出</button>
+
+  <script type="module">
+    import { initAuth, onAuthReady, signOutUser } from './js/firebase-auth.js';
+
+    initAuth();
+
+    onAuthReady(user => {
+      const info = document.getElementById('info');
+      const meta = document.getElementById('meta');
+      const btn = document.getElementById('btn-logout');
+
+      if (user) {
+        info.textContent = `已登录：${user.email}`;
+        meta.innerHTML = `
+          <p>用户 ID：${user.uid}</p>
+          <p>邮箱已验证：${user.emailVerified ? '是' : '否'}</p>
+        `;
+        btn.style.display = 'inline-block';
+      } else {
+        info.innerHTML = '未登录。请先 <a href="/auth/auth.html">登录 / 注册</a>.';
+        meta.innerHTML = '';
+        btn.style.display = 'none';
+      }
+    });
+
+    document.getElementById('btn-logout').addEventListener('click', async () => {
+      await signOutUser();
+      location.href = '/';
+    });
+  </script>
+</body>
+</html>
